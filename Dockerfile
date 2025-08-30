@@ -1,5 +1,5 @@
 # Node.js build stage
-FROM node:20-slim AS builder
+FROM node:20.11.1-slim AS builder
 WORKDIR /app
 COPY web-server/package*.json ./
 RUN npm ci
