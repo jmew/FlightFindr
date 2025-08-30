@@ -11,7 +11,8 @@ services:
       - PORT=3000
       - MCP_SERVER_URL=http://mcp-server:9999/mcp
     depends_on:
-      - mcp-server
+      mcp-server:
+        condition: service_healthy
 
   mcp-server:
     build:
@@ -19,3 +20,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "9999:9999"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/mcp/tools"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
