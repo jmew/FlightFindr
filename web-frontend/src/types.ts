@@ -16,6 +16,7 @@ export interface Message {
 }
 
 export interface Deal {
+  [key: string]: any;
   date: string;
   program: string;
   route: string;

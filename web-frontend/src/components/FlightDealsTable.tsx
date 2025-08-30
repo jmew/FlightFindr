@@ -33,8 +33,6 @@ const columns = [
   { key: 'flightNumbers', name: 'Flights', sortable: true },
 ];
 
-import { SortColumn } from 'react-data-grid';
-
 const FlightDealsTable = ({ deals }: FlightDealsTableProps) => {
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>([
     { columnKey: 'points', direction: 'ASC' },
