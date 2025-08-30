@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "build": "echo 'Build step not required'",
+    "build": "echo \"Build step bypassed\"",
     "start": "tsx src/index.ts",
     "lint": "eslint ."
   },
@@ -17,8 +17,8 @@
     "tsx": "^4.16.2"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
+    "@types/cors": "2.8.19",
+    "@types/express": "5.0.3",
     "typescript": "^5.4.5"
   }
 }
