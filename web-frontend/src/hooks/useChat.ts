@@ -64,7 +64,7 @@ export function useChat() {
     }
 
     const eventSource = new EventSource(
-      `/chat?message=${encodeURIComponent(
+      `https://flightfindr.onrender.com/chat?message=${encodeURIComponent(
         message,
       )}&sessionId=${sessionIdRef.current}`,
     );

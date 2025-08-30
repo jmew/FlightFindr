@@ -25,7 +25,6 @@ export async function getOrCreateClient(sessionId: string) {
     targetDir: process.cwd(),
     cwd: process.cwd(),
     debugMode: false,
-    checkpointing: true,
     approvalMode: ApprovalMode.YOLO,
     contextFileName: 'GEMINI.md',
     mcpServers: {
