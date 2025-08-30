@@ -9,8 +9,9 @@ RUN npm run build
 # Python setup stage
 FROM python:3.11-slim
 WORKDIR /app
-COPY flight-findr-mcp/. .
+COPY flight-findr-mcp/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+COPY flight-findr-mcp/. .
 
 # Final stage
 FROM node:20-slim
@@ -18,9 +19,7 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json .
-COPY --from=0 /usr/local/bin/ /usr/local/bin/
-COPY --from=0 /usr/local/lib/python3.11 /usr/local/lib/python3.11
-COPY flight-findr-mcp/. .
+COPY --from=1 /app /app/flight-findr-mcp
 
 ENV GEMINI_API_KEY=$GEMINI_API_KEY
 EXPOSE 8080
