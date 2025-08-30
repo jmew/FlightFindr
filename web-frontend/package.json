@@ -1,21 +1,17 @@
 {
   "name": "flight-findr",
-  "homepage": "https://jmew.github.io/FlightFindr/",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@types/node": "^24.3.0",
     "axios": "^1.11.0",
     "bootstrap": "^5.3.8",
-    "gh-pages": "^6.3.0",
     "react": "^19.1.1",
     "react-bootstrap": "^2.10.10",
     "react-data-grid": "^7.0.0-beta.57",
