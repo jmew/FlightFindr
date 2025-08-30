@@ -2,7 +2,7 @@
 FROM node:20-slim AS builder
 WORKDIR /app
 COPY web-server/package*.json ./
-RUN npm install
+RUN npm ci
 COPY web-server/. .
 RUN npm run build
 
