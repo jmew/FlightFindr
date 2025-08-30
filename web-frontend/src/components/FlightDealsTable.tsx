@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { DataGrid } from 'react-data-grid';
+import { DataGrid, type SortColumn } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import { FiMaximize } from 'react-icons/fi';
-import FullScreenModal from './FlightDealsTable';
+import FullScreenModal from './FlightDealsTable/index';
 
 export interface FlightDealRow {
   id: number;

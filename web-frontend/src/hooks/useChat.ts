@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { FlightDealRow } from '../components/FlightDealsTable';
-import type { Message, Tool } from '../types';
+import type { Message, Tool, Deal } from '../types';
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
