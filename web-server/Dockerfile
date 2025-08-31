@@ -4,13 +4,14 @@ FROM node:20-slim
 WORKDIR /app
 
 # Copy package files and install dependencies
-COPY web-server/package*.json ./
+COPY package*.json ./
 RUN npm ci
 
 # Copy the rest of the web-server code
-COPY web-server/. .
+COPY . .
 
-# Copy the .gemini directory and GEMINI.md
+# Create .gemini directory and copy GEMINI.md
+RUN mkdir -p /root/.gemini
 COPY .gemini/GEMINI.md /root/.gemini/GEMINI.md
 
 # Expose the port the app runs on
