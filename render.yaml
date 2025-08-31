@@ -1,24 +1,27 @@
 services:
-  # The Node.js Web Server
+  # The Node.js Web Server, using Render's native Node runtime
   - type: web
     name: web-server
     env: node
     plan: free
     rootDir: ./web-server
-    buildCommand: "npm install && npm run build"
+    buildCommand: "npm install"
     startCommand: "npm start"
     healthCheckPath: /
     envVars:
       - key: GEMINI_API_KEY
-        fromSecret: true
+        fromSecret: true # This tells Render to use a secret you've set in the dashboard
       - key: MCP_SERVER_URL
-        value: http://mcp-server:9999/mcp
+        fromService:
+          type: pserv
+          name: mcp-server
+          property: hostport # Use Render's internal service discovery
 
-  # The Python MCP Server
-  - type: pserv
+  # The Python MCP Server, using Render's native Python runtime
+  - type: pserv # Private Service, as it doesn't need to be public
     name: mcp-server
     env: python
     plan: free
     rootDir: ./flight-findr-mcp
     buildCommand: "pip install -r requirements.txt && playwright install --with-deps"
-    startCommand: "python mcp_server.py --transport http"
+    startCommand: "python mcp_server.py --transport=http"
