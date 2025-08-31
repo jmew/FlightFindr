@@ -11,11 +11,22 @@ class PointsYeahScraper:
     """
     def __init__(self, headless: bool = True):
         self.playwright: Playwright = sync_playwright().start()
-        self.browser: Browser = self.playwright.chromium.launch(headless=headless, args=[
-            "--disable-background-timer-throttling",
-            "--disable-backgrounding-occluded-windows",
-            "--disable-renderer-backgrounding",
-        ])
+
+        # Use the same proxy logic as the seats.aero scraper for production
+        proxy_url = os.environ.get("HTTP_PROXY")
+        proxy_settings = {"server": proxy_url} if proxy_url else None
+        if proxy_settings:
+            print("Using proxy for PointsYeah scraper.")
+
+        self.browser: Browser = self.playwright.chromium.launch(
+            headless=headless,
+            proxy=proxy_settings,
+            args=[
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
+            ]
+        )
         self.page: Page = self._create_new_page()
         self._login()
 
@@ -47,45 +58,49 @@ class PointsYeahScraper:
         return page
 
     def _login(self):
-        """Performs a one-time login to PointsYeah with a retry mechanism."""
+        """
+        Performs a one-time login to PointsYeah, retrying the click on failure.
+        """
+        try:
+            print("Navigating to login page...")
+            self.page.goto("https://www.pointsyeah.com/login", timeout=60000)
+            self.page.wait_for_selector('input[name="username"]', state="visible", timeout=15000)
+            
+            print("Entering credentials...")
+            self.page.fill('input[name="username"]', "jepara2048@mogash.com")
+            self.page.fill('input[name="password"]', "Password1!")
+        
+        except Exception as e:
+            print(f"An error occurred during initial page load and form fill: {e}")
+            self.page.screenshot(path="error_login_setup.png")
+            self.close()
+            raise
+
         max_retries = 3
         for attempt in range(max_retries):
-            try:
-                print(f"Navigating to login page (Attempt {attempt + 1}/{max_retries})...")
-                self.page.goto("https://www.pointsyeah.com/login", timeout=60000)
-                self.page.wait_for_selector('input[name="username"]', state="visible", timeout=15000)
-                
-                print("Entering credentials...")
-                self.page.fill('input[name="username"]', "jepara2048@mogash.com")
-                self.page.fill('input[name="password"]', "Password1!")
-                
-                self.page.locator('button[type="submit"].amplify-button--primary').click()
+            print(f"Clicking 'Sign In' (Attempt {attempt + 1}/{max_retries})...")
+            self.page.locator('button[type="submit"].amplify-button--primary').click()
 
-                # Wait for a short period to allow background authentication
-                print("Waiting for session authentication...")
-                time.sleep(3)
+            # Wait for 1 second as requested, to see if an error message appears
+            time.sleep(1)
 
-                # Check for a common error message element. If it's visible, the login failed.
-                error_selector = "div[role='alert'], [class*='error-message']"
-                error_element = self.page.query_selector(error_selector)
-                
-                if error_element and error_element.is_visible():
-                    error_text = error_element.inner_text()
-                    print(f"Login failed with error: {error_text}. Retrying...")
-                    continue # Go to the next attempt in the loop
-
-                # If no error is found, assume success and break the loop
-                print("Login successful.")
-                return
-
-            except Exception as e:
-                print(f"An error occurred during login attempt {attempt + 1}: {e}")
+            # Check for the specific "Incorrect username or password" error
+            error_selector = "text=Incorrect username or password"
+            error_element = self.page.query_selector(error_selector)
+            
+            if error_element and error_element.is_visible():
+                print("Login failed with 'Incorrect username or password'. Retrying click...")
+                # If this is the last attempt, fail loudly
                 if attempt == max_retries - 1:
-                    self.page.screenshot(path="error_login.png")
-                    self.close()
-                    raise # Re-raise the final exception to stop the process
+                    self.page.screenshot(path="login_final_attempt_failed.png")
+                    raise Exception("Login failed after multiple retries: Incorrect username or password.")
+                continue # Go to the next attempt to re-click
+
+            # If no error is found, assume success and break the loop
+            print("Login successful.")
+            return
         
-        # If the loop completes without a successful login
+        # This should not be reached if the loop logic is correct, but as a fallback:
         raise Exception("Login failed after multiple retries.")
 
     def scrape(self, origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
