@@ -19,17 +19,42 @@ def scrape_pointsyeah(origin, destination, start_date, end_date):
     all_deals = []
     
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, args=[
+        browser = p.chromium.launch(headless=True, args=[
             "--disable-background-timer-throttling",
             "--disable-backgrounding-occluded-windows",
             "--disable-renderer-backgrounding",
-        ]) # Headed mode is more reliable for this site
+        ])
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            viewport={'width': 1920, 'height': 1080},
+            locale='en-US',
+            timezone_id='America/New_York',
+            color_scheme='light'
         )
         page = context.new_page()
-        os.system("osascript -e 'tell application \"System Events\" to set visible of process \"Chromium\" to false'")
-        page.set_viewport_size({"width": 800, "height": 600})
+
+        # Anti-bot detection script
+        stealth_script = """
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => false,
+            });
+            window.navigator.chrome = {
+                runtime: {},
+            };
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3],
+            });
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en'],
+            });
+        """
+        page.add_init_script(stealth_script)
 
         # --- Login ---
         try:
