@@ -155,6 +155,7 @@ class FlightSearchMCP(FastMCP):
 mcp_server = FlightSearchMCP()
 
 def main():
+    print("MCP Server: Starting...")
     parser = argparse.ArgumentParser(description="Run the Flight Search MCP server.")
     parser.add_argument(
         "--transport",
@@ -164,10 +165,15 @@ def main():
     )
     args = parser.parse_args()
 
+    print(f"MCP Server: Transport selected: {args.transport}")
+
     if args.transport == "stdio":
         mcp_server.run(transport="stdio")
     elif args.transport == "http":
-        mcp_server.run(transport="http", host="localhost", port=9999)
+        print("MCP Server: Starting HTTP server on localhost:9999...")
+        mcp_server.run(transport="http", host="0.0.0.0", port=9999)
+    
+    print("MCP Server: mcp_server.run() has completed.")
 
 if __name__ == "__main__":
     main()
