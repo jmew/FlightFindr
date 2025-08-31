@@ -161,15 +161,22 @@ import atexit
 
 mcp_server = FlightSearchMCP()
 
+playwright_instance = None
+
 def cleanup():
     """Synchronous cleanup function to be called on exit."""
+    global playwright_instance
     print("Shutting down scrapers...")
-    try:
-        asyncio.run(pointsyeah.close_scraper())
-    except Exception as e:
-        print(f"Error closing PointsYeah scraper: {e}")
+    if playwright_instance:
+        try:
+            asyncio.run(pointsyeah.close_scraper())
+            asyncio.run(seats_aero.close_scraper())
+            asyncio.run(playwright_instance.stop())
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
 
 def main():
+    global playwright_instance
     print("MCP Server: Starting...")
     parser = argparse.ArgumentParser(description="Run the Flight Search MCP server.")
     parser.add_argument(
@@ -182,14 +189,14 @@ def main():
 
     print(f"MCP Server: Transport selected: {args.transport}")
 
-    # Register the cleanup function to be called on exit
     atexit.register(cleanup)
 
-    # Initialize the scraper using a temporary event loop
     try:
-        asyncio.run(pointsyeah.initialize_scraper())
+        playwright_instance = asyncio.run(asyncio.create_task(seats_aero.async_playwright().start()))
+        asyncio.run(pointsyeah.initialize_scraper(playwright_instance))
+        asyncio.run(seats_aero.initialize_scraper(playwright_instance))
     except Exception as e:
-        print(f"Failed to initialize scraper: {e}")
+        print(f"Failed to initialize scrapers: {e}")
         return
 
     if args.transport == "stdio":

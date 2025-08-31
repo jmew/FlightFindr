@@ -206,13 +206,12 @@ class PointsYeahScraper:
 # --- Global scraper instance management ---
 scraper_instance: Optional[PointsYeahScraper] = None
 
-async def initialize_scraper():
+async def initialize_scraper(playwright: Playwright):
     """Initializes the global scraper instance."""
     global scraper_instance
     if scraper_instance is None:
         print("Initializing PointsYeah scraper at server startup...")
-        playwright_instance = await async_playwright().start()
-        scraper_instance = PointsYeahScraper(playwright_instance)
+        scraper_instance = PointsYeahScraper(playwright)
         await scraper_instance.start()
         print("PointsYeah scraper initialized successfully.")
     else:
@@ -225,21 +224,19 @@ async def close_scraper():
         print("Closing PointsYeah scraper at server shutdown...")
         await scraper_instance.close()
         scraper_instance = None
-        # The playwright instance will be stopped by the main server
 
 async def scrape_pointsyeah(origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Main function to scrape PointsYeah."""
     global scraper_instance
     if scraper_instance is None:
-        await initialize_scraper()
+        raise Exception("PointsYeah scraper has not been initialized.")
     
-    if scraper_instance:
-        return await scraper_instance.scrape(origin, destination, start_date, end_date)
-    raise Exception("Failed to initialize scraper.")
+    return await scraper_instance.scrape(origin, destination, start_date, end_date)
 
 async def main_test():
+    playwright = await async_playwright().start()
     try:
-        await initialize_scraper()
+        await initialize_scraper(playwright)
         
         print("--- First Search ---")
         deals1 = await scrape_pointsyeah("JFK", "SFO", "2025-10-10", "2025-10-10")
@@ -253,6 +250,8 @@ async def main_test():
 
     finally:
         await close_scraper()
+        await playwright.stop()
+
 
 
 if __name__ == '__main__':
