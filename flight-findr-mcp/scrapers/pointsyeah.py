@@ -82,11 +82,16 @@ class PointsYeahScraper:
         try:
             print("Navigating to login page...")
             await self.page.goto("https://www.pointsyeah.com/login", timeout=120000, wait_until="domcontentloaded")
+
+            # Wait for the login modal to appear and be stable
+            print("Waiting for login modal...")
+            login_modal = self.page.locator('div[role="dialog"]')
+            await login_modal.wait_for(state="visible", timeout=30000)
             
             print("Entering credentials...")
-            # Use actionability waits: Playwright will auto-wait for the element to be ready to be filled.
-            await self.page.locator('input[name="username"]').fill("jepara2048@mogash.com", timeout=12000)
-            await self.page.locator('input[name="password"]').fill("Password1!", timeout=10000)
+            # Scope the locators to within the modal for robustness
+            await login_modal.locator('input[name="username"]').fill("jepara2048@mogash.com", timeout=30000)
+            await login_modal.locator('input[name="password"]').fill("Password1!", timeout=30000)
         
         except Exception as e:
             print(f"An error occurred during initial page load and form fill: {e}")
