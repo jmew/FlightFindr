@@ -17,4 +17,4 @@ COPY . ./
 EXPOSE 9999
 
 # Set the command to start the MCP server
-CMD ["python", "-u", "mcp_server.py", "--transport", "http"]
+CMD ["python", "-u", "mcp_server.py"]

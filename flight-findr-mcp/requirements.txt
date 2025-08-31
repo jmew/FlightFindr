@@ -5,3 +5,4 @@ lxml
 fastmcp
 uvicorn
 fast-flights
+fastapi

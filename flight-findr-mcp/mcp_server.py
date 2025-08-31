@@ -1,5 +1,7 @@
 import asyncio
 import argparse
+from fastapi import FastAPI
+import uvicorn
 from fastmcp import FastMCP
 from fastmcp.tools import Tool
 from scrapers import seats_aero, pointsyeah
@@ -153,6 +155,14 @@ class FlightSearchMCP(FastMCP):
         return json.dumps(result, indent=2)
 
 mcp_server = FlightSearchMCP()
+app = FastAPI()
+
+# Mount the MCP server at the /mcp endpoint
+app.mount("/mcp", mcp_server.as_asgi())
+
+@app.get("/")
+async def health_check():
+    return {"status": "ok"}
 
 def main():
     print("MCP Server: Starting...")
@@ -160,7 +170,7 @@ def main():
     parser.add_argument(
         "--transport",
         choices=["stdio", "http"],
-        default="stdio",
+        default="http",
         help="The transport protocol to use.",
     )
     args = parser.parse_args()
@@ -168,10 +178,11 @@ def main():
     print(f"MCP Server: Transport selected: {args.transport}")
 
     if args.transport == "stdio":
+        # For stdio, we run the original MCP server directly
         mcp_server.run(transport="stdio")
     elif args.transport == "http":
-        print("MCP Server: Starting HTTP server on localhost:9999...")
-        mcp_server.run(transport="http", host="0.0.0.0", port=9999)
+        print("MCP Server: Starting HTTP server on 0.0.0.0:9999...")
+        uvicorn.run(app, host="0.0.0.0", port=9999)
     
     print("MCP Server: mcp_server.run() has completed.")
 
