@@ -27,13 +27,10 @@ def scrape_seats_aero(origin, destination, start_date, end_date, programs=None, 
 
     print(f"Scraping {search_url}")
 
-    proxy_url = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+    proxy_url = os.environ.get("HTTP_PROXY")
     if proxy_url:
         print("Using proxy for seats.aero in production mode.")
-    else:
-        proxy_url = None
-        print("Production mode detected, but no proxy URL is set.")
-
+    
     client = Client(impersonate="safari_17.2.1", proxy=proxy_url)
     try:
         search_response = client.get(search_url)

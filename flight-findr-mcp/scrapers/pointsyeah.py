@@ -17,14 +17,8 @@ class PointsYeahScraper:
 
     async def start(self):
         """Initializes the browser and logs in."""
-        # proxy_url = os.environ.get("HTTP_PROXY")
-        # proxy_settings = {"server": proxy_url} if proxy_url else None
-        # if proxy_settings:
-        #     print("Using proxy for PointsYeah scraper.")
-
         self.browser = await self.playwright.chromium.launch(
             headless=self.headless,
-            # proxy=proxy_settings,
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
@@ -83,15 +77,13 @@ class PointsYeahScraper:
             print("Navigating to login page...")
             await self.page.goto("https://www.pointsyeah.com/login", timeout=120000, wait_until="domcontentloaded")
 
-            # Wait for the login modal to appear and be stable
             print("Waiting for login modal...")
             login_modal = self.page.locator('div[role="dialog"]')
             await login_modal.wait_for(state="visible", timeout=30000)
             
             print("Entering credentials...")
-            # Scope the locators to within the modal for robustness
-            await login_modal.locator('input[name="username"]').fill("jepara2048@mogash.com", timeout=30000)
-            await login_modal.locator('input[name="password"]').fill("Password1!", timeout=30000)
+            await login_modal.locator('input[name="username"]').fill("jepara2048@mogash.com", timeout=10000)
+            await login_modal.locator('input[name="password"]').fill("Password1!", timeout=10000)
         
         except Exception as e:
             print(f"An error occurred during initial page load and form fill: {e}")
@@ -213,11 +205,10 @@ class PointsYeahScraper:
 
 # --- Global scraper instance management ---
 scraper_instance: Optional[PointsYeahScraper] = None
-playwright_instance: Optional[Playwright] = None
 
 async def initialize_scraper():
     """Initializes the global scraper instance."""
-    global scraper_instance, playwright_instance
+    global scraper_instance
     if scraper_instance is None:
         print("Initializing PointsYeah scraper at server startup...")
         playwright_instance = await async_playwright().start()
@@ -229,14 +220,12 @@ async def initialize_scraper():
 
 async def close_scraper():
     """Closes the global scraper instance."""
-    global scraper_instance, playwright_instance
+    global scraper_instance
     if scraper_instance:
         print("Closing PointsYeah scraper at server shutdown...")
         await scraper_instance.close()
         scraper_instance = None
-    if playwright_instance:
-        await playwright_instance.stop()
-        playwright_instance = None
+        # The playwright instance will be stopped by the main server
 
 async def scrape_pointsyeah(origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """Main function to scrape PointsYeah."""
@@ -264,6 +253,7 @@ async def main_test():
 
     finally:
         await close_scraper()
+
 
 if __name__ == '__main__':
     asyncio.run(main_test())

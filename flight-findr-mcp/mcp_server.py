@@ -157,7 +157,17 @@ class FlightSearchMCP(FastMCP):
 
         return json.dumps(result, indent=2)
 
+import atexit
+
 mcp_server = FlightSearchMCP()
+
+def cleanup():
+    """Synchronous cleanup function to be called on exit."""
+    print("Shutting down scrapers...")
+    try:
+        asyncio.run(pointsyeah.close_scraper())
+    except Exception as e:
+        print(f"Error closing PointsYeah scraper: {e}")
 
 def main():
     print("MCP Server: Starting...")
@@ -172,6 +182,9 @@ def main():
 
     print(f"MCP Server: Transport selected: {args.transport}")
 
+    # Register the cleanup function to be called on exit
+    atexit.register(cleanup)
+
     # Initialize the scraper using a temporary event loop
     try:
         asyncio.run(pointsyeah.initialize_scraper())
@@ -179,16 +192,11 @@ def main():
         print(f"Failed to initialize scraper: {e}")
         return
 
-    try:
-        if args.transport == "stdio":
-            mcp_server.run(transport="stdio")
-        elif args.transport == "http":
-            print("MCP Server: Starting HTTP server on localhost:9999...")
-            mcp_server.run(transport="http", host="0.0.0.0", port=9999)
-    finally:
-        # Ensure the scraper is closed gracefully
-        print("Shutting down scraper...")
-        asyncio.run(pointsyeah.close_scraper())
+    if args.transport == "stdio":
+        mcp_server.run(transport="stdio")
+    elif args.transport == "http":
+        print("MCP Server: Starting HTTP server on localhost:9999...")
+        mcp_server.run(transport="http", host="0.0.0.0", port=9999)
     
     print("MCP Server: mcp_server.run() has completed.")
 
