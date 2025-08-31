@@ -19,6 +19,11 @@ async function main() {
   app.get('/chat', chatHandler);
   app.get('/suggestions', suggestionHandler);
 
+  // Add a health check route for Render
+  app.get('/', (req, res) => {
+    res.status(200).send('OK');
+  });
+
   return new Promise<void>((resolve, reject) => {
     app
       .listen(port, () => {
