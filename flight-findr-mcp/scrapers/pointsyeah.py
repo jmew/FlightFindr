@@ -12,15 +12,15 @@ class PointsYeahScraper:
     def __init__(self, headless: bool = True):
         self.playwright: Playwright = sync_playwright().start()
 
-        # Use the same proxy logic as the seats.aero scraper for production
-        proxy_url = os.environ.get("HTTP_PROXY")
-        proxy_settings = {"server": proxy_url} if proxy_url else None
-        if proxy_settings:
-            print("Using proxy for PointsYeah scraper.")
+        # Proxy logic temporarily disabled for testing.
+        # proxy_url = os.environ.get("HTTP_PROXY")
+        # proxy_settings = {"server": proxy_url} if proxy_url else None
+        # if proxy_settings:
+        #     print("Using proxy for PointsYeah scraper.")
 
         self.browser: Browser = self.playwright.chromium.launch(
             headless=headless,
-            proxy=proxy_settings,
+            # proxy=proxy_settings,
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
@@ -90,7 +90,7 @@ class PointsYeahScraper:
         
         except Exception as e:
             print(f"An error occurred during initial page load and form fill: {e}")
-            self.page.screenshot(path="error_login_setup.png")
+            # self.page.screenshot(path="error_login_setup.png")
             self.close()
             raise
 
