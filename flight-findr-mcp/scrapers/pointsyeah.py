@@ -47,8 +47,17 @@ class PointsYeahScraper:
         )
         page = context.new_page()
 
-        # Block unnecessary resources to save memory
-        page.route("**/*", lambda route: route.abort() if route.request.resource_type in ["image", "stylesheet", "font", "media"] else route.continue_())
+        def intelligent_block(route):
+            # Allow the data API calls to go through
+            if "flight/search/fetch_result" in route.request.url or "flight/search/create_task" in route.request.url:
+                return route.continue_()
+            # Block non-essential assets, but allow stylesheets for UI elements like progress bars
+            if route.request.resource_type in ["image", "font", "media"]:
+                return route.abort()
+            # Allow everything else (including stylesheets and scripts)
+            route.continue_()
+
+        page.route("**/*", intelligent_block)
         
         # Anti-bot detection script
         stealth_script = """
@@ -72,8 +81,8 @@ class PointsYeahScraper:
         """
         try:
             print("Navigating to login page...")
-            self.page.goto("https://www.pointsyeah.com/login", timeout=60000)
-            self.page.wait_for_selector('input[name="username"]', state="visible", timeout=15000)
+            self.page.goto("https://www.pointsyeah.com/login", timeout=120000, wait_until="domcontentloaded")
+            self.page.wait_for_selector('input[name="username"]', state="visible", timeout=30000)
             
             print("Entering credentials...")
             self.page.fill('input[name="username"]', "jepara2048@mogash.com")
