@@ -16,6 +16,9 @@ class FlightSearchMCP(FastMCP):
         )
         self.add_tool(tool)
 
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, pointsyeah.initialize_scraper)
+
     async def check_flight_points_prices(
         self,
         origin_airports: List[str],

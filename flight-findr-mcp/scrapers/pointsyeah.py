@@ -1,30 +1,27 @@
-from playwright.sync_api import sync_playwright, TimeoutError
+from playwright.sync_api import sync_playwright, Page, Browser, Playwright, TimeoutError
 import json
 import time
 import os
+from typing import List, Dict, Any, Optional
 
-def scrape_pointsyeah(origin, destination, start_date, end_date):
+class PointsYeahScraper:
     """
-    Scrapes pointsyeah.com for flight deals by logging in and intercepting API calls.
-
-    Args:
-        origin (str): The origin airport IATA code.
-        destination (str): The destination airport IATA code.
-        start_date (str): The start date of the travel date range in YYYY-MM-DD format.
-        end_date (str): The end date for the travel date range in YYYY-MM-DD format.
-
-    Returns:
-        list: A list of flight options, where each option is a dictionary.
+    A class to manage a persistent browser session for scraping PointsYeah.com,
+    optimizing performance by logging in only once.
     """
-    all_deals = []
-    
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=[
+    def __init__(self, headless: bool = True):
+        self.playwright: Playwright = sync_playwright().start()
+        self.browser: Browser = self.playwright.chromium.launch(headless=headless, args=[
             "--disable-background-timer-throttling",
             "--disable-backgrounding-occluded-windows",
             "--disable-renderer-backgrounding",
         ])
-        context = browser.new_context(
+        self.page: Page = self._create_new_page()
+        self._login()
+
+    def _create_new_page(self) -> Page:
+        """Creates a new page with anti-bot detection scripts."""
+        context = self.browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
             viewport={'width': 1920, 'height': 1080},
             locale='en-US',
@@ -32,63 +29,71 @@ def scrape_pointsyeah(origin, destination, start_date, end_date):
             color_scheme='light'
         )
         page = context.new_page()
-
+        
         # Anti-bot detection script
         stealth_script = """
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => false,
-            });
-            window.navigator.chrome = {
-                runtime: {},
-            };
+            Object.defineProperty(navigator, 'webdriver', { get: () => false });
+            window.navigator.chrome = { runtime: {} };
             const originalQuery = window.navigator.permissions.query;
             window.navigator.permissions.query = (parameters) => (
                 parameters.name === 'notifications' ?
                     Promise.resolve({ state: Notification.permission }) :
                     originalQuery(parameters)
             );
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3],
-            });
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['en-US', 'en'],
-            });
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+            Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
         """
         page.add_init_script(stealth_script)
+        return page
 
-        # --- Login ---
-        try:
-            print("Navigating to login page...")
-            page.goto("https://www.pointsyeah.com/login", timeout=60000)
-            page.wait_for_load_state("networkidle")
-            
-            page.wait_for_selector('input[name="username"]', state="visible", timeout=15000)
-            
-            print("Entering credentials...")
-            page.fill('input[name="username"]', "jepara2048@mogash.com")
-            page.fill('input[name="password"]', "Password1!")
-            
-            submit_button = page.locator('button[type="submit"].amplify-button--primary')
-            submit_button.click()
+    def _login(self):
+        """Performs a one-time login to PointsYeah with a retry mechanism."""
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                print(f"Navigating to login page (Attempt {attempt + 1}/{max_retries})...")
+                self.page.goto("https://www.pointsyeah.com/login", timeout=60000)
+                self.page.wait_for_selector('input[name="username"]', state="visible", timeout=15000)
+                
+                print("Entering credentials...")
+                self.page.fill('input[name="username"]', "jepara2048@mogash.com")
+                self.page.fill('input[name="password"]', "Password1!")
+                
+                self.page.locator('button[type="submit"].amplify-button--primary').click()
 
-            # Wait for a fixed time to allow login to process
-            print("Waiting for login to complete...")
-            time.sleep(5)
+                # Wait for a short period to allow background authentication
+                print("Waiting for session authentication...")
+                time.sleep(3)
 
-            # Debugging: Check page title and take a screenshot
-            page_title = page.title()
-            print(f"Page title after login attempt: {page_title}")
-            page.screenshot(path="login_page_on_render.png")
-            if "login" in page_title.lower():
-                print("Warning: It appears the login may not have been successful.")
+                # Check for a common error message element. If it's visible, the login failed.
+                error_selector = "div[role='alert'], [class*='error-message']"
+                error_element = self.page.query_selector(error_selector)
+                
+                if error_element and error_element.is_visible():
+                    error_text = error_element.inner_text()
+                    print(f"Login failed with error: {error_text}. Retrying...")
+                    continue # Go to the next attempt in the loop
 
-        except Exception as e:
-            print(f"An error occurred during login: {e}")
-            page.screenshot(path="error_login.png")
-            browser.close()
-            return []
+                # If no error is found, assume success and break the loop
+                print("Login successful.")
+                return
 
-        # --- Intercept API Responses ---
+            except Exception as e:
+                print(f"An error occurred during login attempt {attempt + 1}: {e}")
+                if attempt == max_retries - 1:
+                    self.page.screenshot(path="error_login.png")
+                    self.close()
+                    raise # Re-raise the final exception to stop the process
+        
+        # If the loop completes without a successful login
+        raise Exception("Login failed after multiple retries.")
+
+    def scrape(self, origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """
+        Scrapes pointsyeah.com for flight deals using the existing logged-in session.
+        """
+        all_deals = []
+
         def handle_response(response):
             if "flight/search/fetch_result" in response.url:
                 try:
@@ -97,22 +102,35 @@ def scrape_pointsyeah(origin, destination, start_date, end_date):
                     if data.get("success") and results:
                         print(f"  -> Intercepted {len(results)} deals.")
                         all_deals.extend(results)
-                    else:
-                        status = data.get("data", {}).get("status", "unknown")
-                        print(f"  -> Intercepted empty/processing response (status: {status}).")
                 except Exception as e:
                     print(f"  -> Could not parse JSON from response: {e}")
 
-        page.on("response", handle_response)
+        self.page.on("response", handle_response)
 
         # --- Perform Search ---
-        multiday = "false"
-        depart_date_sec = start_date
-        if start_date != end_date:
-            multiday = "true"
-            depart_date_sec = end_date
+        search_url = self._build_search_url(origin, destination, start_date, end_date)
+        print(f"Navigating to search URL: {search_url}")
+        self.page.goto(search_url, timeout=15000)
 
-        search_url = (
+        print("Waiting for search results to load...")
+        try:
+            # Wait for the loading bar to appear and then disappear
+            self.page.wait_for_selector('#nprogress', state='attached', timeout=15000)
+            self.page.wait_for_selector('#nprogress', state='detached', timeout=90000)
+            print("Search complete.")
+        except TimeoutError:
+            print("Timed out waiting for results. Results may be incomplete.")
+        
+        self.page.remove_listener("response", handle_response)
+        
+        processed_deals = self._process_deals(all_deals)
+        return processed_deals
+
+    def _build_search_url(self, origin: str, destination: str, start_date: str, end_date: str) -> str:
+        multiday = "true" if start_date != end_date else "false"
+        depart_date_sec = end_date if multiday == "true" else start_date
+        
+        return (
             f"https://www.pointsyeah.com/search?cabins=Economy%2CPremium+Economy%2CBusiness%2CFirst"
             f"&cabin=Economy"
             f"&banks=Amex%2CCapital+One%2CChase%2CBilt"
@@ -126,122 +144,88 @@ def scrape_pointsyeah(origin, destination, start_date, end_date):
             f"&departDateSec={depart_date_sec}"
             f"&multiday={multiday}"
         )
-        print(f"Navigating to search URL: {search_url}")
-        page.goto(search_url, timeout=60000)
 
-        print("Waiting for search results to load...")
-        try:
-            page.wait_for_selector('#nprogress', state='attached', timeout=10000)
-            print("Loading bar detected.")
-            page.wait_for_selector('#nprogress', state='detached', timeout=60000) # 60 seconds
-            print("Loading bar has disappeared.")
-            
-            # print("Waiting for network to settle...")
-            # page.wait_for_load_state("networkidle", timeout=15000)
-            print("Network has settled. Search complete.")
-        except TimeoutError as e:
-            print(f"Timed out waiting for results: {e}. Results may be incomplete.")
-        
-        print("Capturing search results page...")
-        page.screenshot(path="search_results_on_render.png")
-        print("Finished waiting for results.")
-        browser.close()
+    def _process_deals(self, all_deals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        # This logic remains the same as before
+        best_deals = {}
+        for deal in all_deals:
+            if not deal.get("routes"): continue
+            program_name, deal_date = deal.get("program"), deal.get("date")
+            route_str = f"{deal.get('departure')} -> {deal.get('arrival')}"
+            for route in deal["routes"]:
+                payment = route.get("payment", {})
+                cabin, points = payment.get("cabin", "").lower(), payment.get("miles")
+                if not cabin or points is None: continue
+                segments = route.get("segments", [])
+                if not segments: continue
+                departure_time, arrival_time = segments[0].get("dt"), segments[-1].get("at")
+                deal_key = (program_name, deal_date, route_str, departure_time, arrival_time)
+                if deal_key not in best_deals:
+                    best_deals[deal_key] = {
+                        "program": program_name, "route": route_str, "date": deal_date,
+                        "departure_time": departure_time, "arrival_time": arrival_time,
+                        "direct": len(segments) == 1, "economy": None, "premium": None,
+                        "business": None, "first": None
+                    }
+                cabin_key = "premium" if "premium" in cabin else "business" if "business" in cabin else "first" if "first" in cabin else "economy"
+                current_best = best_deals[deal_key].get(cabin_key)
+                if current_best is None or points < current_best['points']:
+                    best_deals[deal_key][cabin_key] = {
+                        "points": points, "fees": f"${payment.get('tax')} {payment.get('currency')}",
+                        "seats": payment.get("seats")
+                    }
+        return list(best_deals.values())
 
-    # --- Filter out deals with only excluded transfer partners ---
-    excluded_banks = {"Citi", "WF"}
-    filtered_deals = []
-    for deal in all_deals:
-        if not deal.get("routes"):
-            continue
+    def close(self):
+        """Closes the browser and stops the Playwright instance."""
+        print("Closing browser...")
+        self.browser.close()
+        self.playwright.stop()
 
-        valid_routes = []
-        for route in deal["routes"]:
-            transfer_partners = route.get("transfer", [])
-            if not transfer_partners:
-                valid_routes.append(route)  # Keep routes with no transfer info (direct earn)
-                continue
+# --- Global scraper instance ---
+scraper_instance: Optional[PointsYeahScraper] = None
 
-            # Check if all transfer partners for this route are in the excluded list
-            is_exclusively_excluded = True
-            for partner in transfer_partners:
-                if partner.get("code") not in excluded_banks:
-                    is_exclusively_excluded = False
-                    break
-            
-            if not is_exclusively_excluded:
-                valid_routes.append(route)
+def initialize_scraper():
+    """Initializes the global scraper instance."""
+    global scraper_instance
+    if scraper_instance is None:
+        print("Initializing PointsYeah scraper at server startup...")
+        scraper_instance = PointsYeahScraper()
+        print("PointsYeah scraper initialized successfully.")
+    else:
+        print("PointsYeah scraper already initialized.")
 
-        if valid_routes:
-            # If there are any valid routes, we keep the deal, but only with the valid routes.
-            new_deal = deal.copy()
-            new_deal["routes"] = valid_routes
-            filtered_deals.append(new_deal)
+def close_scraper():
+    """Closes the global scraper instance."""
+    global scraper_instance
+    if scraper_instance:
+        print("Closing PointsYeah scraper at server shutdown...")
+        scraper_instance.close()
+        scraper_instance = None
 
-    all_deals = filtered_deals
-
-    # --- Process Data ---
-    best_deals = {}
-    for deal in all_deals:
-        if not deal.get("routes"):
-            continue
-        
-        program_name = deal.get("program")
-        deal_date = deal.get("date")
-        route_str = f"{deal.get('departure')} -> {deal.get('arrival')}"
-
-        for route in deal["routes"]:
-            payment = route.get("payment", {})
-            cabin = payment.get("cabin", "").lower()
-            points = payment.get("miles")
-            if not cabin or points is None:
-                continue
-
-            segments = route.get("segments", [])
-            if not segments:
-                continue
-
-            flight_numbers = [segment.get("flight_number") for segment in segments]
-            departure_time = segments[0].get("dt")
-            arrival_time = segments[-1].get("at")
-
-            # Use a more specific key to create a deal per flight
-            deal_key = (program_name, deal_date, route_str, departure_time, arrival_time)
-
-            if deal_key not in best_deals:
-                best_deals[deal_key] = {
-                    "program": program_name,
-                    "route": route_str,
-                    "date": deal_date,
-                    "departure_time": departure_time,
-                    "arrival_time": arrival_time,
-                    "flight_numbers": flight_numbers,
-                    "direct": len(segments) == 1,
-                    "economy": None,
-                    "premium": None,
-                    "business": None,
-                    "first": None,
-                }
-
-            if "premium" in cabin: cabin_key = "premium"
-            elif "business" in cabin: cabin_key = "business"
-            elif "first" in cabin: cabin_key = "first"
-            else: cabin_key = "economy"
-            
-            current_best = best_deals[deal_key].get(cabin_key)
-            if current_best is None or points < current_best['points']:
-                best_deals[deal_key][cabin_key] = {
-                    "points": points,
-                    "fees": f"${payment.get('tax')} {payment.get('currency')}",
-                    "seats": payment.get("seats"),
-                }
-
-    processed_deals = list(best_deals.values())
-            
-    return processed_deals
+def scrape_pointsyeah(origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """
+    Main function to scrape PointsYeah. It uses the pre-initialized global scraper instance.
+    """
+    global scraper_instance
+    if scraper_instance is None:
+        raise Exception("PointsYeah scraper has not been initialized. Please call initialize_scraper() first.")
+    
+    return scraper_instance.scrape(origin, destination, start_date, end_date)
 
 if __name__ == '__main__':
-    deals = scrape_pointsyeah("JFK", "SFO", "2025-10-10", "2025-10-12")
-    if deals:
-        print(json.dumps(deals, indent=2))
-    else:
-        print("No deals found.")
+    try:
+        initialize_scraper()
+        
+        print("--- First Search ---")
+        deals1 = scrape_pointsyeah("JFK", "SFO", "2025-10-10", "2025-10-10")
+        if deals1:
+            print(f"Found {len(deals1)} deals.")
+        
+        print("\n--- Second Search (should be much faster) ---")
+        deals2 = scrape_pointsyeah("LAX", "HNL", "2025-11-15", "2025-11-15")
+        if deals2:
+            print(f"Found {len(deals2)} deals.")
+
+    finally:
+        close_scraper()

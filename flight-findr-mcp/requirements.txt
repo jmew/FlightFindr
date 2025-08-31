@@ -6,3 +6,4 @@ fastmcp
 uvicorn
 fast-flights
 fastapi
+primp
