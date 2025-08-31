@@ -13,15 +13,16 @@ services:
         sync: false # This prompts you to enter the secret in the Render dashboard
       - key: MCP_SERVER_URL
         fromService:
-          type: pserv
+          type: web # Correctly reference the mcp-server as a web service
           name: mcp-server
           property: hostport # Use Render's internal service discovery
 
-  # The Python MCP Server, using Render's native Python runtime
-  - type: pserv # Private Service, as it doesn't need to be public
+  # The Python MCP Server, now as a Web Service for the free tier
+  - type: web # Changed from pserv to web
     name: mcp-server
     env: python
     plan: free
     rootDir: ./flight-findr-mcp
     buildCommand: "pip install -r requirements.txt && playwright install --with-deps"
     startCommand: "python mcp_server.py --transport=http"
+    healthCheckPath: /mcp/tools # Add a health check for the web service
