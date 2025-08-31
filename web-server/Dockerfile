@@ -1,21 +1,35 @@
-# Use a Node.js base image
-FROM node:20-slim
-
+# Stage 1: Build the application
+FROM node:20-slim AS builder
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Copy package configuration and install all dependencies
 COPY package*.json ./
 RUN npm ci
 
-# Copy the rest of the web-server code
-COPY . .
+# Copy source code and tsconfig
+COPY src ./src
+COPY tsconfig.json ./
 
-# Create .gemini directory and copy GEMINI.md
-RUN mkdir -p /root/.gemini
+# Build the TypeScript project
+RUN npm run build
+
+# Stage 2: Create the production image
+FROM node:20-slim
+WORKDIR /app
+
+# Copy package configuration and install production dependencies only
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy the built application from the builder stage
+COPY --from=builder /app/dist ./dist
+
+# Copy the GEMINI.md file
 COPY .gemini/GEMINI.md /root/.gemini/GEMINI.md
+RUN mkdir -p /root/.gemini
+RUN mv /app/GEMINI.md /root/.gemini/GEMINI.md
 
-# Expose the port the app runs on
+
+# Expose the port and start the server
 EXPOSE 3000
-
-# Set the command to start the server
 CMD ["npm", "start"]
