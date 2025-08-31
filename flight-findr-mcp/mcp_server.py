@@ -172,7 +172,7 @@ async def main_async(args):
         finally:
             await shutdown_scrapers()
     elif args.transport == "http":
-        config = uvicorn.Config(mcp_server, host="0.0.0.0", port=9999, log_level="info")
+        config = uvicorn.Config(mcp_server.app, host="0.0.0.0", port=9999, log_level="info")
         server = uvicorn.Server(config)
         print("MCP Server: Starting HTTP server with Uvicorn on 0.0.0.0:9999...")
         try:
