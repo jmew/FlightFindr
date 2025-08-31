@@ -27,19 +27,14 @@ def scrape_seats_aero(origin, destination, start_date, end_date, programs=None, 
 
     print(f"Scraping {search_url}")
 
-    proxy = None
-    if os.environ.get("NODE_ENV") == "production":
-        proxy_url = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
-        if proxy_url:
-            print("Using proxy for seats.aero in production mode.")
-            proxy = {
-                "http": proxy_url,
-                "https": proxy_url,
-            }
-        else:
-            print("Production mode detected, but no proxy URL is set.")
+    proxy_url = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+    if proxy_url:
+        print("Using proxy for seats.aero in production mode.")
+    else:
+        proxy_url = None
+        print("Production mode detected, but no proxy URL is set.")
 
-    client = Client(impersonate="safari_17.2.1", proxy=proxy)
+    client = Client(impersonate="safari_17.2.1", proxy=proxy_url)
     try:
         search_response = client.get(search_url)
         print(f"seats.aero search response status: {search_response.status_code}")
