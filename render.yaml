@@ -1,0 +1,28 @@
+services:
+  # The Node.js Web Server
+  - type: web
+    name: web-server
+    env: node
+    plan: free
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm start"
+    healthCheckPath: /
+    envVars:
+      - key: GEMINI_API_KEY
+        fromSecret: true
+      - key: MCP_SERVER_URL
+        value: http://mcp-server:9999/mcp
+    build:
+      context: ./web-server
+      dockerfile: Dockerfile
+
+  # The Python MCP Server
+  - type: pserv
+    name: mcp-server
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt && playwright install --with-deps"
+    startCommand: "python mcp_server.py --transport http"
+    build:
+      context: ./flight-findr-mcp
+      dockerfile: Dockerfile

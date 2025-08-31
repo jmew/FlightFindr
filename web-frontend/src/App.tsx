@@ -1,5 +1,4 @@
 import './App.css';
-// Trigger re-deploy
 import ChatConversation from './components/ChatConversation';
 import { useChat } from './hooks/useChat';
 
