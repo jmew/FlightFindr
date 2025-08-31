@@ -10,7 +10,7 @@ services:
     healthCheckPath: /
     envVars:
       - key: GEMINI_API_KEY
-        fromSecret: true # This tells Render to use a secret you've set in the dashboard
+        sync: false # This prompts you to enter the secret in the Render dashboard
       - key: MCP_SERVER_URL
         fromService:
           type: pserv
