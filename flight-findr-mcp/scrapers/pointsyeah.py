@@ -81,8 +81,8 @@ class PointsYeahScraper:
         if not self.page: return
         try:
             print("Navigating to login page...")
-            await self.page.goto("https://www.pointsyeah.com/login", timeout=120000, wait_until="domcontentloaded")
-            await self.page.wait_for_selector('input[name="username"]', state="visible", timeout=30000)
+            await self.page.goto("https://www.pointsyeah.com/login", timeout=10000, wait_until="domcontentloaded")
+            await self.page.wait_for_selector('input[name="username"]', state="visible", timeout=10000)
             
             print("Entering credentials...")
             await self.page.fill('input[name="username"]', "jepara2048@mogash.com")
