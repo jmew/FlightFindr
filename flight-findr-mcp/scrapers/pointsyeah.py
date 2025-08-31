@@ -22,6 +22,12 @@ class PointsYeahScraper:
             headless=headless,
             proxy=proxy_settings,
             args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-zygote",
+                "--single-process",
                 "--disable-background-timer-throttling",
                 "--disable-backgrounding-occluded-windows",
                 "--disable-renderer-backgrounding",
@@ -31,7 +37,7 @@ class PointsYeahScraper:
         self._login()
 
     def _create_new_page(self) -> Page:
-        """Creates a new page with anti-bot detection scripts."""
+        """Creates a new page with anti-bot detection scripts and resource blocking."""
         context = self.browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
             viewport={'width': 1920, 'height': 1080},
@@ -40,6 +46,9 @@ class PointsYeahScraper:
             color_scheme='light'
         )
         page = context.new_page()
+
+        # Block unnecessary resources to save memory
+        page.route("**/*", lambda route: route.abort() if route.request.resource_type in ["image", "stylesheet", "font", "media"] else route.continue_())
         
         # Anti-bot detection script
         stealth_script = """
