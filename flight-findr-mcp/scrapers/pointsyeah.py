@@ -69,18 +69,18 @@ def scrape_pointsyeah(origin, destination, start_date, end_date):
             page.fill('input[name="password"]', "Password1!")
             
             submit_button = page.locator('button[type="submit"].amplify-button--primary')
-            current_url = page.url
             submit_button.click()
 
-            try:
-                # Wait for the URL to change from the login page URL.
-                page.wait_for_url(lambda url: url != current_url, timeout=3000)
-            except TimeoutError:
-                print("URL did not change after 3 seconds. Retrying click...")
-                time.sleep(1)
-                submit_button.click()
-                # On retry, wait a bit longer for the URL to change.
-                page.wait_for_url(lambda url: url != current_url, timeout=3000)
+            # Wait for a fixed time to allow login to process
+            print("Waiting for login to complete...")
+            time.sleep(5)
+
+            # Debugging: Check page title and take a screenshot
+            page_title = page.title()
+            print(f"Page title after login attempt: {page_title}")
+            page.screenshot(path="login_page_on_render.png")
+            if "login" in page_title.lower():
+                print("Warning: It appears the login may not have been successful.")
 
         except Exception as e:
             print(f"An error occurred during login: {e}")
@@ -141,8 +141,9 @@ def scrape_pointsyeah(origin, destination, start_date, end_date):
             print("Network has settled. Search complete.")
         except TimeoutError as e:
             print(f"Timed out waiting for results: {e}. Results may be incomplete.")
-            page.screenshot(path="error_search.png")
         
+        print("Capturing search results page...")
+        page.screenshot(path="search_results_on_render.png")
         print("Finished waiting for results.")
         browser.close()
 

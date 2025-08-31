@@ -27,18 +27,24 @@ def scrape_seats_aero(origin, destination, start_date, end_date, programs=None, 
 
     print(f"Scraping {search_url}")
 
-    proxies = {
-        "http": os.environ.get("HTTP_PROXY"),
-        "https": os.environ.get("HTTPS_PROXY"),
-    }
-    
-    if proxies["http"] or proxies["https"]:
-        print("Using proxy for seats.aero")
-    
+    proxies = None
+    if os.environ.get("NODE_ENV") == "production":
+        proxy_url = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+        if proxy_url:
+            print("Using proxy for seats.aero in production mode.")
+            proxies = {
+                "http": proxy_url,
+                "https": proxy_url,
+            }
+        else:
+            print("Production mode detected, but no proxy URL is set.")
+
     client = Client(impersonate="safari_17.2.1", proxies=proxies)
     try:
         search_response = client.get(search_url)
+        print(f"seats.aero search response status: {search_response.status_code}")
         if search_response.status_code != 200:
+            print(f"seats.aero search response text: {search_response.text}")
             raise Exception(f"Failed to fetch search results: {search_response.status_code}")
         search_data = json.loads(search_response.text)
     except Exception as e:
@@ -47,13 +53,18 @@ def scrape_seats_aero(origin, destination, start_date, end_date, programs=None, 
 
     all_deals = []
     if not search_data.get('metadata'):
+        print("No metadata found in seats.aero search response.")
         return []
+
+    print(f"Found {len(search_data['metadata'])} potential items in seats.aero metadata.")
 
     for item in search_data['metadata']:
         enrichment_url = f"https://seats.aero/_api/enrichment_modern/{item['id']}?m=1&min_seats=1&applicable_cabin=any&additional_days_num=1&max_fees=40000&disable_live_filtering=false&date={start_date}&origins={origin}&destinations={destination}"
         try:
             enrichment_response = client.get(enrichment_url)
             if enrichment_response.status_code != 200:
+                print(f"seats.aero enrichment response status for id {item['id']}: {enrichment_response.status_code}")
+                print(f"seats.aero enrichment response text for id {item['id']}: {enrichment_response.text}")
                 raise Exception(f"Failed to fetch enrichment data: {enrichment_response.status_code}")
             enrichment_data = json.loads(enrichment_response.text)
         except Exception as e:
@@ -61,7 +72,10 @@ def scrape_seats_aero(origin, destination, start_date, end_date, programs=None, 
             continue
 
         if not enrichment_data.get('trips'):
+            print(f"No trips found in enrichment data for id {item['id']}.")
             continue
+        
+        print(f"Found {len(enrichment_data['trips'])} trips in enrichment data for id {item['id']}.")
 
         for trip in enrichment_data['trips']:
             deal = {
