@@ -11,12 +11,15 @@ type GeminiClient = ReturnType<Config['getGeminiClient']>;
 const sessions = new Map<string, { config: Config; client: GeminiClient }>();
 
 export async function getOrCreateClient(sessionId: string) {
+  //TODO update GEMINI.md with todays date
   if (sessions.has(sessionId)) {
     console.log(`Reusing Gemini client for session: ${sessionId}`);
     return sessions.get(sessionId)!;
   }
 
   console.log(`Initializing Gemini client for session: ${sessionId}`);
+
+  const mcpUrl = process.env.MCP_URL || 'http://localhost:9999/mcp';
 
   const configParams: ConfigParameters = {
     sessionId,
@@ -36,8 +39,8 @@ export async function getOrCreateClient(sessionId: string) {
       'replace'
     ],
     mcpServers: {
-      'the-point-finder': {
-        httpUrl: 'http://localhost:9999/mcp',
+      'Flight Deal Finder': {
+        httpUrl: mcpUrl,
         timeout: 180000,
         trust: true,
       },
