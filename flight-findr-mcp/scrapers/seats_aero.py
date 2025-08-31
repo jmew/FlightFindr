@@ -1,4 +1,5 @@
 import json
+import os
 from primp import Client
 
 def scrape_seats_aero(origin, destination, start_date, end_date, programs=None, alliances=None, transfer_partners=None, points_min=None, points_max=None, days=None):
@@ -25,7 +26,16 @@ def scrape_seats_aero(origin, destination, start_date, end_date, programs=None, 
         search_url += f"&additional_days_num={days}"
 
     print(f"Scraping {search_url}")
-    client = Client(impersonate="safari_17.2.1")
+
+    proxies = {
+        "http": os.environ.get("HTTP_PROXY"),
+        "https": os.environ.get("HTTPS_PROXY"),
+    }
+    
+    if proxies["http"] or proxies["https"]:
+        print("Using proxy for seats.aero")
+    
+    client = Client(impersonate="safari_17.2.1", proxies=proxies)
     try:
         search_response = client.get(search_url)
         if search_response.status_code != 200:

@@ -27,6 +27,15 @@ export async function getOrCreateClient(sessionId: string) {
     debugMode: false,
     approvalMode: ApprovalMode.YOLO,
     contextFileName: 'GEMINI.md',
+    excludeTools: ['run_shell_command', 
+      'read_many_files', 
+      'list_directory', 
+      'read_file', 
+      'write_file', 
+      'glob',
+      'search_file_content',
+      'replace'
+    ],
     mcpServers: {
       'the-point-finder': {
         httpUrl: 'http://localhost:9999/mcp',

@@ -23,7 +23,7 @@ const MessageList: React.FC<MessageListProps> = ({
         <div className="spinner" />
         {thought && (
           <span className="thought">
-            {thought} ({"(this may take up to 2 minutes), "}{elapsedTime}s)
+            {thought} ({elapsedTime}s [This may take up to 2 minutes])
           </span>
         )}
       </div>
