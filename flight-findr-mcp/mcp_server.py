@@ -21,7 +21,7 @@ class FlightSearchMCP(FastMCP):
         origin_airports: List[str],
         destination_airports: List[str],
         start_date: str,
-        end_date: str,
+        end_date: Optional[str] = None,
         programs: Optional[List[str]] = None,
         alliances: Optional[List[str]] = None,
         transfer_partners: Optional[List[str]] = None,
@@ -68,31 +68,13 @@ class FlightSearchMCP(FastMCP):
         #     points_max,
         #     days,
         # )
-        pointsyeah_task = pointsyeah.scrape_pointsyeah(origin_str, dest_str, start_date, end_date)
-
         all_deals = []
         try:
-            # Await both tasks concurrently
-            results = await asyncio.gather(pointsyeah_task, return_exceptions=True)
-            
-            # seats_aero_deals = results[0]
-            # if isinstance(seats_aero_deals, Exception):
-            #     print(f"Error scraping seats.aero: {seats_aero_deals}")
-            #     seats_aero_deals = []
-            # for deal in seats_aero_deals:
-            #     deal["source"] = "seats.aero"
-            # all_deals.extend(seats_aero_deals)
-            # print(f"Found {len(seats_aero_deals)} deals on seats.aero")
-
-            pointsyeah_deals = results[0]
-            if isinstance(pointsyeah_deals, Exception):
-                print(f"Error scraping pointsyeah: {pointsyeah_deals}")
-                pointsyeah_deals = []
+            pointsyeah_deals = await pointsyeah.scrape_pointsyeah(origin_str, dest_str, start_date, end_date if end_date else start_date)
             for deal in pointsyeah_deals:
                 deal["source"] = "pointsyeah"
             all_deals.extend(pointsyeah_deals)
             print(f"Found {len(pointsyeah_deals)} deals on pointsyeah")
-
         except Exception as e:
             print(f"An unexpected error occurred during scraping: {e}")
 
@@ -158,23 +140,15 @@ class FlightSearchMCP(FastMCP):
         return json.dumps(result, indent=2)
 
 from playwright.async_api import Playwright, async_playwright
-import atexit
+import uvicorn
 
 mcp_server = FlightSearchMCP()
 
 playwright_instance: Optional[Playwright] = None
 
-def cleanup():
-    """Synchronous cleanup function to be called on exit."""
-    print("Shutting down scrapers...")
-    if playwright_instance:
-        try:
-            asyncio.run(shutdown_scrapers())
-        except Exception as e:
-            print(f"Error during cleanup: {e}")
-
 async def shutdown_scrapers():
     """Asynchronous part of the cleanup."""
+    print("Shutting down scrapers...")
     await pointsyeah.close_scraper()
     # await seats_aero.close_scraper()
     if playwright_instance:
@@ -186,6 +160,26 @@ async def startup():
     playwright_instance = await async_playwright().start()
     await pointsyeah.initialize_scraper(playwright_instance)
     # await seats_aero.initialize_scraper(playwright_instance)
+
+async def main_async(args):
+    """The main async function to run the server."""
+    await startup()
+
+    if args.transport == "stdio":
+        print("Running in stdio mode. Note: Graceful shutdown might not be fully configured for this mode.")
+        try:
+            mcp_server.run(transport="stdio")
+        finally:
+            await shutdown_scrapers()
+    elif args.transport == "http":
+        config = uvicorn.Config(mcp_server, host="0.0.0.0", port=9999, log_level="info")
+        server = uvicorn.Server(config)
+        print("MCP Server: Starting HTTP server with Uvicorn on 0.0.0.0:9999...")
+        try:
+            await server.serve()
+        finally:
+            print("Server stopped. Shutting down scrapers...")
+            await shutdown_scrapers()
 
 def main():
     print("MCP Server: Starting...")
@@ -199,22 +193,15 @@ def main():
     args = parser.parse_args()
     print(f"MCP Server: Transport selected: {args.transport}")
 
-    atexit.register(cleanup)
-
     try:
-        asyncio.run(startup())
-        
-        if args.transport == "stdio":
-            mcp_server.run(transport="stdio")
-        elif args.transport == "http":
-            print("MCP Server: Starting HTTP server on localhost:9999...")
-            mcp_server.run(transport="http", host="0.0.0.0", port=9999)
-            
+        asyncio.run(main_async(args))
+    except KeyboardInterrupt:
+        print("\nServer stopped by user.")
     except Exception as e:
-        print(f"Server failed to start: {e}")
-        cleanup()
+        print(f"Server failed: {e}")
     
-    print("MCP Server: mcp_server.run() has completed.")
+    print("MCP Server: Process finished.")
+
 
 if __name__ == "__main__":
     main()
