@@ -20,7 +20,6 @@ type GeminiClient = ReturnType<Config['getGeminiClient']>;
 const sessions = new Map<string, { config: Config; client: GeminiClient }>();
 
 export async function getOrCreateClient(sessionId: string) {
-  //TODO update GEMINI.md with todays date
   if (sessions.has(sessionId)) {
     console.log(`Reusing Gemini client for session: ${sessionId}`);
     return sessions.get(sessionId)!;
@@ -29,6 +28,8 @@ export async function getOrCreateClient(sessionId: string) {
   console.log(`Initializing Gemini client for session: ${sessionId}`);
 
   const mcpUrl = process.env.MCP_URL || 'http://localhost:9999/mcp';
+  const today = new Date().toLocaleDateString('en-CA');
+  const memoryWithDate = `Today's date is ${today}. ${memory}`;
 
   const configParams: ConfigParameters = {
     sessionId,
@@ -38,7 +39,7 @@ export async function getOrCreateClient(sessionId: string) {
     cwd: process.cwd(),
     debugMode: false,
     approvalMode: ApprovalMode.YOLO,
-    userMemory: memory,
+    userMemory: memoryWithDate,
     excludeTools: ['run_shell_command', 
       'read_many_files', 
       'list_directory', 

@@ -54,37 +54,37 @@ class FlightSearchMCP(FastMCP):
         print(f"Searching for flights from {origin_str} to {dest_str} between {start_date} and {end_date}...")
 
         # Run scrapers in parallel
-        seats_aero_task = loop.run_in_executor(
-            None,
-            seats_aero.scrape_seats_aero,
-            origin_str,
-            dest_str,
-            start_date,
-            end_date,
-            programs,
-            alliances,
-            transfer_partners,
-            points_min,
-            points_max,
-            days,
-        )
+        # seats_aero_task = loop.run_in_executor(
+        #     None,
+        #     seats_aero.scrape_seats_aero,
+        #     origin_str,
+        #     dest_str,
+        #     start_date,
+        #     end_date,
+        #     programs,
+        #     alliances,
+        #     transfer_partners,
+        #     points_min,
+        #     points_max,
+        #     days,
+        # )
         pointsyeah_task = pointsyeah.scrape_pointsyeah(origin_str, dest_str, start_date, end_date)
 
         all_deals = []
         try:
             # Await both tasks concurrently
-            results = await asyncio.gather(seats_aero_task, pointsyeah_task, return_exceptions=True)
+            results = await asyncio.gather(pointsyeah_task, return_exceptions=True)
             
-            seats_aero_deals = results[0]
-            if isinstance(seats_aero_deals, Exception):
-                print(f"Error scraping seats.aero: {seats_aero_deals}")
-                seats_aero_deals = []
-            for deal in seats_aero_deals:
-                deal["source"] = "seats.aero"
-            all_deals.extend(seats_aero_deals)
-            print(f"Found {len(seats_aero_deals)} deals on seats.aero")
+            # seats_aero_deals = results[0]
+            # if isinstance(seats_aero_deals, Exception):
+            #     print(f"Error scraping seats.aero: {seats_aero_deals}")
+            #     seats_aero_deals = []
+            # for deal in seats_aero_deals:
+            #     deal["source"] = "seats.aero"
+            # all_deals.extend(seats_aero_deals)
+            # print(f"Found {len(seats_aero_deals)} deals on seats.aero")
 
-            pointsyeah_deals = results[1]
+            pointsyeah_deals = results[0]
             if isinstance(pointsyeah_deals, Exception):
                 print(f"Error scraping pointsyeah: {pointsyeah_deals}")
                 pointsyeah_deals = []
@@ -162,7 +162,6 @@ import atexit
 
 mcp_server = FlightSearchMCP()
 
-# Global variable to hold the Playwright instance
 playwright_instance: Optional[Playwright] = None
 
 def cleanup():
@@ -170,7 +169,6 @@ def cleanup():
     print("Shutting down scrapers...")
     if playwright_instance:
         try:
-            # Create a new loop to run the async cleanup tasks
             asyncio.run(shutdown_scrapers())
         except Exception as e:
             print(f"Error during cleanup: {e}")
@@ -178,16 +176,16 @@ def cleanup():
 async def shutdown_scrapers():
     """Asynchronous part of the cleanup."""
     await pointsyeah.close_scraper()
-    await seats_aero.close_scraper()
+    # await seats_aero.close_scraper()
     if playwright_instance:
         await playwright_instance.stop()
 
-async def startup_scrapers():
-    """Initializes scrapers and sets the global playwright instance."""
+async def startup():
+    """Initializes scrapers."""
     global playwright_instance
     playwright_instance = await async_playwright().start()
     await pointsyeah.initialize_scraper(playwright_instance)
-    await seats_aero.initialize_scraper(playwright_instance)
+    # await seats_aero.initialize_scraper(playwright_instance)
 
 def main():
     print("MCP Server: Starting...")
@@ -199,26 +197,22 @@ def main():
         help="The transport protocol to use.",
     )
     args = parser.parse_args()
-
     print(f"MCP Server: Transport selected: {args.transport}")
 
-    # Initialize scrapers in a single async operation
-    try:
-        asyncio.run(startup_scrapers())
-    except Exception as e:
-        print(f"Failed to initialize scrapers: {e}")
-        if playwright_instance:
-            cleanup()
-        return
-
-    # Register the cleanup function to be called on exit *after* successful startup
     atexit.register(cleanup)
 
-    if args.transport == "stdio":
-        mcp_server.run(transport="stdio")
-    elif args.transport == "http":
-        print("MCP Server: Starting HTTP server on localhost:9999...")
-        mcp_server.run(transport="http", host="0.0.0.0", port=9999)
+    try:
+        asyncio.run(startup())
+        
+        if args.transport == "stdio":
+            mcp_server.run(transport="stdio")
+        elif args.transport == "http":
+            print("MCP Server: Starting HTTP server on localhost:9999...")
+            mcp_server.run(transport="http", host="0.0.0.0", port=9999)
+            
+    except Exception as e:
+        print(f"Server failed to start: {e}")
+        cleanup()
     
     print("MCP Server: mcp_server.run() has completed.")
 
