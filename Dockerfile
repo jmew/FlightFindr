@@ -24,6 +24,10 @@ COPY web-server/. .
 # Copy the supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Create .gemini directory and copy GEMINI.md
+RUN mkdir -p /root/.gemini
+COPY .gemini/GEMINI.md /root/.gemini/GEMINI.md
+
 ENV GEMINI_API_KEY=$GEMINI_API_KEY
 EXPOSE 3000 9999 10000
 
