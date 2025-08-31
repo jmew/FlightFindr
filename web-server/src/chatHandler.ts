@@ -98,7 +98,10 @@ export async function chatHandler(req: Request, res: Response) {
           );
           console.log('Tool response:', JSON.stringify(toolResponse, null, 2));
           if (toolResponse?.responseParts) {
-            toolResponseParts.push(...toolResponse.responseParts);
+            // Using `as any` to bypass a strict type check.
+            // The `responseParts` object is compatible at runtime, but its type `PartListUnion`
+            // is not directly assignable to the expected `Part` type.
+            toolResponseParts.push(toolResponse.responseParts as any);
           }
           sendSseMessage(res, 'tool_result', {
             callId: requestInfo.callId,
