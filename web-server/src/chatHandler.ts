@@ -96,7 +96,8 @@ export async function chatHandler(req: Request, res: Response) {
             requestInfo,
             abortController.signal,
           );
-          if (toolResponse.responseParts) {
+          console.log('Tool response:', JSON.stringify(toolResponse, null, 2));
+          if (toolResponse?.responseParts) {
             toolResponseParts.push(...toolResponse.responseParts);
           }
           sendSseMessage(res, 'tool_result', {
