@@ -38,7 +38,7 @@ export async function getOrCreateClient(sessionId: string) {
     mcpServers: {
       'the-point-finder': {
         httpUrl: 'http://localhost:9999/mcp',
-        timeout: 160000,
+        timeout: 180000,
         trust: true,
       },
     },
