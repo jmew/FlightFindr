@@ -16,8 +16,6 @@ class FlightSearchMCP(FastMCP):
         )
         self.add_tool(tool)
 
-        pointsyeah.initialize_scraper()
-
     async def check_flight_points_prices(
         self,
         origin_airports: List[str],
@@ -70,28 +68,33 @@ class FlightSearchMCP(FastMCP):
             points_max,
             days,
         )
-        pointsyeah_task = loop.run_in_executor(
-            None, pointsyeah.scrape_pointsyeah, origin_str, dest_str, start_date, end_date
-        )
+        pointsyeah_task = pointsyeah.scrape_pointsyeah(origin_str, dest_str, start_date, end_date)
 
         all_deals = []
         try:
-            seats_aero_deals = await seats_aero_task
+            # Await both tasks concurrently
+            results = await asyncio.gather(seats_aero_task, pointsyeah_task, return_exceptions=True)
+            
+            seats_aero_deals = results[0]
+            if isinstance(seats_aero_deals, Exception):
+                print(f"Error scraping seats.aero: {seats_aero_deals}")
+                seats_aero_deals = []
             for deal in seats_aero_deals:
                 deal["source"] = "seats.aero"
             all_deals.extend(seats_aero_deals)
             print(f"Found {len(seats_aero_deals)} deals on seats.aero")
-        except Exception as e:
-            print(f"Error scraping seats.aero: {e}")
 
-        try:
-            pointsyeah_deals = await pointsyeah_task
+            pointsyeah_deals = results[1]
+            if isinstance(pointsyeah_deals, Exception):
+                print(f"Error scraping pointsyeah: {pointsyeah_deals}")
+                pointsyeah_deals = []
             for deal in pointsyeah_deals:
                 deal["source"] = "pointsyeah"
             all_deals.extend(pointsyeah_deals)
             print(f"Found {len(pointsyeah_deals)} deals on pointsyeah")
+
         except Exception as e:
-            print(f"Error scraping pointsyeah: {e}")
+            print(f"An unexpected error occurred during scraping: {e}")
 
         if not all_deals:
             return json.dumps({"all_deals": [], "cheapest_deal": None}, indent=2)
@@ -169,11 +172,23 @@ def main():
 
     print(f"MCP Server: Transport selected: {args.transport}")
 
-    if args.transport == "stdio":
-        mcp_server.run(transport="stdio")
-    elif args.transport == "http":
-        print("MCP Server: Starting HTTP server on localhost:9999...")
-        mcp_server.run(transport="http", host="0.0.0.0", port=9999)
+    # Initialize the scraper using a temporary event loop
+    try:
+        asyncio.run(pointsyeah.initialize_scraper())
+    except Exception as e:
+        print(f"Failed to initialize scraper: {e}")
+        return
+
+    try:
+        if args.transport == "stdio":
+            mcp_server.run(transport="stdio")
+        elif args.transport == "http":
+            print("MCP Server: Starting HTTP server on localhost:9999...")
+            mcp_server.run(transport="http", host="0.0.0.0", port=9999)
+    finally:
+        # Ensure the scraper is closed gracefully
+        print("Shutting down scraper...")
+        asyncio.run(pointsyeah.close_scraper())
     
     print("MCP Server: mcp_server.run() has completed.")
 

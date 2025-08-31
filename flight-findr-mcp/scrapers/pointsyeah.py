@@ -1,6 +1,6 @@
-from playwright.sync_api import sync_playwright, Page, Browser, Playwright, TimeoutError
+from playwright.async_api import async_playwright, Page, Browser, Playwright, TimeoutError
 import json
-import time
+import asyncio
 import os
 from typing import List, Dict, Any, Optional
 
@@ -9,18 +9,22 @@ class PointsYeahScraper:
     A class to manage a persistent browser session for scraping PointsYeah.com,
     optimizing performance by logging in only once.
     """
-    def __init__(self, headless: bool = True):
-        self.playwright: Playwright = sync_playwright().start()
+    def __init__(self, playwright: Playwright, headless: bool = True):
+        self.playwright: Playwright = playwright
+        self.headless = headless
+        self.browser: Optional[Browser] = None
+        self.page: Optional[Page] = None
 
-        # Proxy logic temporarily disabled for testing.
-        # proxy_url = os.environ.get("HTTP_PROXY")
-        # proxy_settings = {"server": proxy_url} if proxy_url else None
-        # if proxy_settings:
-        #     print("Using proxy for PointsYeah scraper.")
+    async def start(self):
+        """Initializes the browser and logs in."""
+        proxy_url = os.environ.get("HTTP_PROXY")
+        proxy_settings = {"server": proxy_url} if proxy_url else None
+        if proxy_settings:
+            print("Using proxy for PointsYeah scraper.")
 
-        self.browser: Browser = self.playwright.chromium.launch(
-            headless=headless,
-            # proxy=proxy_settings,
+        self.browser = await self.playwright.chromium.launch(
+            headless=self.headless,
+            proxy=proxy_settings,
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
@@ -33,33 +37,30 @@ class PointsYeahScraper:
                 "--disable-renderer-backgrounding",
             ]
         )
-        self.page: Page = self._create_new_page()
-        self._login()
+        self.page = await self._create_new_page()
+        await self._login()
 
-    def _create_new_page(self) -> Page:
+    async def _create_new_page(self) -> Page:
         """Creates a new page with anti-bot detection scripts and resource blocking."""
-        context = self.browser.new_context(
+        context = await self.browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
             viewport={'width': 1920, 'height': 1080},
             locale='en-US',
             timezone_id='America/New_York',
             color_scheme='light'
         )
-        page = context.new_page()
+        page = await context.new_page()
 
-        def intelligent_block(route):
-            # Allow the data API calls to go through
+        async def intelligent_block(route):
             if "flight/search/fetch_result" in route.request.url or "flight/search/create_task" in route.request.url:
-                return route.continue_()
-            # Block non-essential assets, but allow stylesheets for UI elements like progress bars
-            if route.request.resource_type in ["image", "font", "media"]:
-                return route.abort()
-            # Allow everything else (including stylesheets and scripts)
-            route.continue_()
+                await route.continue_()
+            elif route.request.resource_type in ["image", "font", "media"]:
+                await route.abort()
+            else:
+                await route.continue_()
 
-        page.route("**/*", intelligent_block)
+        await page.route("**/*", intelligent_block)
         
-        # Anti-bot detection script
         stealth_script = """
             Object.defineProperty(navigator, 'webdriver', { get: () => false });
             window.navigator.chrome = { runtime: {} };
@@ -72,65 +73,54 @@ class PointsYeahScraper:
             Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
             Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
         """
-        page.add_init_script(stealth_script)
+        await page.add_init_script(stealth_script)
         return page
 
-    def _login(self):
-        """
-        Performs a one-time login to PointsYeah, retrying the click on failure.
-        """
+    async def _login(self):
+        """Performs a one-time login to PointsYeah."""
+        if not self.page: return
         try:
             print("Navigating to login page...")
-            self.page.goto("https://www.pointsyeah.com/login", timeout=120000, wait_until="domcontentloaded")
-            self.page.wait_for_selector('input[name="username"]', state="visible", timeout=30000)
+            await self.page.goto("https://www.pointsyeah.com/login", timeout=120000, wait_until="domcontentloaded")
+            await self.page.wait_for_selector('input[name="username"]', state="visible", timeout=30000)
             
             print("Entering credentials...")
-            self.page.fill('input[name="username"]', "jepara2048@mogash.com")
-            self.page.fill('input[name="password"]', "Password1!")
+            await self.page.fill('input[name="username"]', "jepara2048@mogash.com")
+            await self.page.fill('input[name="password"]', "Password1!")
         
         except Exception as e:
             print(f"An error occurred during initial page load and form fill: {e}")
-            # self.page.screenshot(path="error_login_setup.png")
-            self.close()
+            await self.close()
             raise
 
         max_retries = 3
         for attempt in range(max_retries):
             print(f"Clicking 'Sign In' (Attempt {attempt + 1}/{max_retries})...")
-            self.page.locator('button[type="submit"].amplify-button--primary').click()
+            await self.page.locator('button[type="submit"].amplify-button--primary').click()
+            await asyncio.sleep(1)
 
-            # Wait for 1 second as requested, to see if an error message appears
-            time.sleep(1)
-
-            # Check for the specific "Incorrect username or password" error
-            error_selector = "text=Incorrect username or password"
-            error_element = self.page.query_selector(error_selector)
-            
-            if error_element and error_element.is_visible():
+            error_element = await self.page.query_selector("text=Incorrect username or password")
+            if error_element and await error_element.is_visible():
                 print("Login failed with 'Incorrect username or password'. Retrying click...")
-                # If this is the last attempt, fail loudly
                 if attempt == max_retries - 1:
-                    self.page.screenshot(path="login_final_attempt_failed.png")
                     raise Exception("Login failed after multiple retries: Incorrect username or password.")
-                continue # Go to the next attempt to re-click
-
-            # If no error is found, assume success and break the loop
+                continue
+            
             print("Login successful.")
             return
         
-        # This should not be reached if the loop logic is correct, but as a fallback:
         raise Exception("Login failed after multiple retries.")
 
-    def scrape(self, origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
-        """
-        Scrapes pointsyeah.com for flight deals using the existing logged-in session.
-        """
-        all_deals = []
+    async def scrape(self, origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """Scrapes pointsyeah.com for flight deals."""
+        if not self.page:
+            raise Exception("Scraper not initialized properly.")
 
-        def handle_response(response):
+        all_deals = []
+        async def handle_response(response):
             if "flight/search/fetch_result" in response.url:
                 try:
-                    data = response.json()
+                    data = await response.json()
                     results = data.get("data", {}).get("result")
                     if data.get("success") and results:
                         print(f"  -> Intercepted {len(results)} deals.")
@@ -140,29 +130,24 @@ class PointsYeahScraper:
 
         self.page.on("response", handle_response)
 
-        # --- Perform Search ---
         search_url = self._build_search_url(origin, destination, start_date, end_date)
         print(f"Navigating to search URL: {search_url}")
-        self.page.goto(search_url, timeout=15000)
+        await self.page.goto(search_url, timeout=15000)
 
         print("Waiting for search results to load...")
         try:
-            # Wait for the loading bar to appear and then disappear
-            self.page.wait_for_selector('#nprogress', state='attached', timeout=15000)
-            self.page.wait_for_selector('#nprogress', state='detached', timeout=90000)
+            await self.page.wait_for_selector('#nprogress', state='attached', timeout=15000)
+            await self.page.wait_for_selector('#nprogress', state='detached', timeout=90000)
             print("Search complete.")
         except TimeoutError:
             print("Timed out waiting for results. Results may be incomplete.")
         
         self.page.remove_listener("response", handle_response)
-        
-        processed_deals = self._process_deals(all_deals)
-        return processed_deals
+        return self._process_deals(all_deals)
 
     def _build_search_url(self, origin: str, destination: str, start_date: str, end_date: str) -> str:
         multiday = "true" if start_date != end_date else "false"
         depart_date_sec = end_date if multiday == "true" else start_date
-        
         return (
             f"https://www.pointsyeah.com/search?cabins=Economy%2CPremium+Economy%2CBusiness%2CFirst"
             f"&cabin=Economy"
@@ -179,7 +164,6 @@ class PointsYeahScraper:
         )
 
     def _process_deals(self, all_deals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        # This logic remains the same as before
         best_deals = {}
         for deal in all_deals:
             if not deal.get("routes"): continue
@@ -209,56 +193,65 @@ class PointsYeahScraper:
                     }
         return list(best_deals.values())
 
-    def close(self):
-        """Closes the browser and stops the Playwright instance."""
+    async def close(self):
+        """Closes the browser."""
         print("Closing browser...")
-        self.browser.close()
-        self.playwright.stop()
+        if self.browser:
+            await self.browser.close()
 
-# --- Global scraper instance ---
+# --- Global scraper instance management ---
 scraper_instance: Optional[PointsYeahScraper] = None
+playwright_instance: Optional[Playwright] = None
 
-def initialize_scraper():
+async def initialize_scraper():
     """Initializes the global scraper instance."""
-    global scraper_instance
+    global scraper_instance, playwright_instance
     if scraper_instance is None:
         print("Initializing PointsYeah scraper at server startup...")
-        scraper_instance = PointsYeahScraper()
+        playwright_instance = await async_playwright().start()
+        scraper_instance = PointsYeahScraper(playwright_instance)
+        await scraper_instance.start()
         print("PointsYeah scraper initialized successfully.")
     else:
         print("PointsYeah scraper already initialized.")
 
-def close_scraper():
+async def close_scraper():
     """Closes the global scraper instance."""
-    global scraper_instance
+    global scraper_instance, playwright_instance
     if scraper_instance:
         print("Closing PointsYeah scraper at server shutdown...")
-        scraper_instance.close()
+        await scraper_instance.close()
         scraper_instance = None
+    if playwright_instance:
+        await playwright_instance.stop()
+        playwright_instance = None
 
-def scrape_pointsyeah(origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
-    """
-    Main function to scrape PointsYeah. It uses the pre-initialized global scraper instance.
-    """
+async def scrape_pointsyeah(origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """Main function to scrape PointsYeah."""
     global scraper_instance
     if scraper_instance is None:
-        raise Exception("PointsYeah scraper has not been initialized. Please call initialize_scraper() first.")
+        await initialize_scraper()
     
-    return scraper_instance.scrape(origin, destination, start_date, end_date)
+    if scraper_instance:
+        return await scraper_instance.scrape(origin, destination, start_date, end_date)
+    raise Exception("Failed to initialize scraper.")
 
-if __name__ == '__main__':
+async def main_test():
     try:
-        initialize_scraper()
+        await initialize_scraper()
         
         print("--- First Search ---")
-        deals1 = scrape_pointsyeah("JFK", "SFO", "2025-10-10", "2025-10-10")
+        deals1 = await scrape_pointsyeah("JFK", "SFO", "2025-10-10", "2025-10-10")
         if deals1:
             print(f"Found {len(deals1)} deals.")
         
         print("\n--- Second Search (should be much faster) ---")
-        deals2 = scrape_pointsyeah("LAX", "HNL", "2025-11-15", "2025-11-15")
+        deals2 = await scrape_pointsyeah("LAX", "HNL", "2025-11-15", "2025-11-15")
         if deals2:
             print(f"Found {len(deals2)} deals.")
 
     finally:
-        close_scraper()
+        await close_scraper()
+
+if __name__ == '__main__':
+    asyncio.run(main_test())
