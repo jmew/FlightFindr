@@ -17,14 +17,14 @@ class PointsYeahScraper:
 
     async def start(self):
         """Initializes the browser and logs in."""
-        proxy_url = os.environ.get("HTTP_PROXY")
-        proxy_settings = {"server": proxy_url} if proxy_url else None
-        if proxy_settings:
-            print("Using proxy for PointsYeah scraper.")
+        # proxy_url = os.environ.get("HTTP_PROXY")
+        # proxy_settings = {"server": proxy_url} if proxy_url else None
+        # if proxy_settings:
+        #     print("Using proxy for PointsYeah scraper.")
 
         self.browser = await self.playwright.chromium.launch(
             headless=self.headless,
-            proxy=proxy_settings,
+            # proxy=proxy_settings,
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
@@ -90,6 +90,13 @@ class PointsYeahScraper:
         
         except Exception as e:
             print(f"An error occurred during initial page load and form fill: {e}")
+            try:
+                page_content = await self.page.content()
+                print("--- Page Content on Timeout ---")
+                print(page_content)
+                print("---")
+            except Exception as content_error:
+                print(f"Could not retrieve page content: {content_error}")
             await self.close()
             raise
 
