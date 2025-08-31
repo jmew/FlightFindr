@@ -1,4 +1,4 @@
-from playwright.async_api import Page, Browser, Playwright, TimeoutError, async_playwright
+from playwright.async_api import async_playwright, Page, Browser, Playwright, TimeoutError
 import json
 import asyncio
 import os
@@ -6,7 +6,8 @@ from typing import List, Dict, Any, Optional
 
 class PointsYeahScraper:
     """
-    A class to manage a browser session for scraping PointsYeah.com.
+    A class to manage a persistent browser session for scraping PointsYeah.com,
+    optimizing performance by logging in only once.
     """
     def __init__(self, playwright: Playwright, headless: bool = True):
         self.playwright: Playwright = playwright
@@ -16,7 +17,6 @@ class PointsYeahScraper:
 
     async def start(self):
         """Initializes the browser and logs in."""
-        print("Launching browser...")
         self.browser = await self.playwright.chromium.launch(
             headless=self.headless,
             args=[
@@ -203,25 +203,56 @@ class PointsYeahScraper:
         if self.browser:
             await self.browser.close()
 
-async def scrape_pointsyeah(playwright: Playwright, origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
-    """
-    Initializes a scraper, performs a single search, and cleans up.
-    """
-    scraper = PointsYeahScraper(playwright)
-    try:
-        await scraper.start()
-        deals = await scraper.scrape(origin, destination, start_date, end_date)
-        return deals
-    finally:
-        await scraper.close()
+# --- Global scraper instance management ---
+scraper_instance: Optional[PointsYeahScraper] = None
+
+async def initialize_scraper(playwright: Playwright):
+    """Initializes the global scraper instance."""
+    global scraper_instance
+    if scraper_instance is None:
+        print("Initializing PointsYeah scraper at server startup...")
+        scraper_instance = PointsYeahScraper(playwright)
+        await scraper_instance.start()
+        print("PointsYeah scraper initialized successfully.")
+    else:
+        print("PointsYeah scraper already initialized.")
+
+async def close_scraper():
+    """Closes the global scraper instance."""
+    global scraper_instance
+    if scraper_instance:
+        print("Closing PointsYeah scraper at server shutdown...")
+        await scraper_instance.close()
+        scraper_instance = None
+
+async def scrape_pointsyeah(origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """Main function to scrape PointsYeah."""
+    global scraper_instance
+    if scraper_instance is None:
+        raise Exception("PointsYeah scraper has not been initialized.")
+    
+    return await scraper_instance.scrape(origin, destination, start_date, end_date)
 
 async def main_test():
-    """Test function to run a single scrape."""
-    async with async_playwright() as playwright:
-        deals = await scrape_pointsyeah(playwright, "JFK", "SFO", "2025-10-10", "2025-10-10")
-        if deals:
-            print(f"Found {len(deals)} deals.")
-            # print(json.dumps(deals, indent=2))
+    playwright = await async_playwright().start()
+    try:
+        await initialize_scraper(playwright)
+        
+        print("--- First Search ---")
+        deals1 = await scrape_pointsyeah("JFK", "SFO", "2025-10-10", "2025-10-10")
+        if deals1:
+            print(f"Found {len(deals1)} deals.")
+        
+        print("\n--- Second Search (should be much faster) ---")
+        deals2 = await scrape_pointsyeah("LAX", "HNL", "2025-11-15", "2025-11-15")
+        if deals2:
+            print(f"Found {len(deals2)} deals.")
+
+    finally:
+        await close_scraper()
+        await playwright.stop()
+
+
 
 if __name__ == '__main__':
     asyncio.run(main_test())

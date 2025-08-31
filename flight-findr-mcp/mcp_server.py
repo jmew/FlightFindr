@@ -1,12 +1,13 @@
 import asyncio
 import argparse
+import uvicorn
 from fastmcp import FastMCP
 from fastmcp.tools import Tool
 from scrapers import pointsyeah
 import json
 from typing import List, Optional
 from cash_price import get_flight_cash_prices, normalize_program_name
-from playwright.async_api import async_playwright
+from playwright.async_api import Playwright, async_playwright
 
 class FlightSearchMCP(FastMCP):
     def __init__(self):
@@ -40,9 +41,7 @@ class FlightSearchMCP(FastMCP):
 
         all_deals = []
         try:
-            async with async_playwright() as p:
-                pointsyeah_deals = await pointsyeah.scrape_pointsyeah(p, origin_str, dest_str, start_date, end_date)
-            
+            pointsyeah_deals = await pointsyeah.scrape_pointsyeah(origin_str, dest_str, start_date, end_date)
             for deal in pointsyeah_deals:
                 deal["source"] = "pointsyeah"
             all_deals.extend(pointsyeah_deals)
@@ -111,8 +110,27 @@ class FlightSearchMCP(FastMCP):
 
 mcp_server = FlightSearchMCP()
 
+# --- Lifecycle Management ---
+playwright_instance: Optional[Playwright] = None
+
+async def startup_event():
+    """Initializes the playwright instance and scrapers."""
+    global playwright_instance
+    print("Server starting up, initializing scrapers...")
+    playwright_instance = await async_playwright().start()
+    await pointsyeah.initialize_scraper(playwright_instance)
+    print("Scrapers initialized.")
+
+async def shutdown_event():
+    """Closes the scrapers and playwright instance."""
+    global playwright_instance
+    print("Server shutting down, closing scrapers...")
+    await pointsyeah.close_scraper()
+    if playwright_instance:
+        await playwright_instance.stop()
+    print("Scrapers and Playwright closed.")
+
 def main():
-    print("MCP Server: Starting...")
     parser = argparse.ArgumentParser(description="Run the Flight Search MCP server.")
     parser.add_argument(
         "--transport",
@@ -121,11 +139,30 @@ def main():
         help="The transport protocol to use.",
     )
     args = parser.parse_args()
-    print(f"MCP Server: Transport selected: {args.transport}")
 
-    mcp_server.run(transport=args.transport, host="0.0.0.0", port=9999)
+    if args.transport == 'stdio':
+        # Fallback for stdio mode, which doesn't use Uvicorn
+        print("Running in stdio mode...")
+        mcp_server.run(transport="stdio")
+        return
+
+    print("MCP Server: Starting with Uvicorn...")
     
-    print("MCP Server: mcp_server.run() has completed.")
+    # Get the ASGI app from the FastMCP instance
+    app = mcp_server.http_app()
+
+    # Attach startup and shutdown event handlers
+    app.add_event_handler("startup", startup_event)
+    app.add_event_handler("shutdown", shutdown_event)
+
+    # Configure and run the Uvicorn server
+    config = uvicorn.Config(app, host="0.0.0.0", port=9999, log_level="info")
+    server = uvicorn.Server(config)
+    
+    # Uvicorn's run() is blocking and will handle the main event loop
+    server.run()
+    
+    print("MCP Server has shut down.")
 
 if __name__ == "__main__":
     main()
