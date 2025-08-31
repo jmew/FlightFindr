@@ -16,7 +16,7 @@ RUN playwright install --with-deps
 COPY flight-findr-mcp/. .
 
 # Final stage: Combine both services into a single Node.js image
-FROM node:20.11.1-slim
+FROM node:20-bookworm
 RUN apt-get update && apt-get install -y supervisor && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
