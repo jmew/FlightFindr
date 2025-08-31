@@ -12,9 +12,6 @@ services:
         fromSecret: true
       - key: MCP_SERVER_URL
         value: http://mcp-server:9999/mcp
-    build:
-      context: ./web-server
-      dockerfile: Dockerfile
 
   # The Python MCP Server
   - type: pserv
@@ -23,6 +20,3 @@ services:
     plan: free
     buildCommand: "pip install -r requirements.txt && playwright install --with-deps"
     startCommand: "python mcp_server.py --transport http"
-    build:
-      context: ./flight-findr-mcp
-      dockerfile: Dockerfile
