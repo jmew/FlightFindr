@@ -2,17 +2,18 @@ import asyncio
 import argparse
 from fastmcp import FastMCP
 from fastmcp.tools import Tool
-from scrapers import seats_aero, pointsyeah
+from scrapers import pointsyeah
 import json
 from typing import List, Optional
 from cash_price import get_flight_cash_prices, normalize_program_name
+from playwright.async_api import async_playwright
 
 class FlightSearchMCP(FastMCP):
     def __init__(self):
         super().__init__()
         tool = Tool.from_function(
             self.check_flight_points_prices,
-            description="Finds the best flight deals using points and cashfrom various sources.",
+            description="Finds the best flight deals using points and cash from various sources.",
         )
         self.add_tool(tool)
 
@@ -21,7 +22,7 @@ class FlightSearchMCP(FastMCP):
         origin_airports: List[str],
         destination_airports: List[str],
         start_date: str,
-        end_date: Optional[str] = None,
+        end_date: str,
         programs: Optional[List[str]] = None,
         alliances: Optional[List[str]] = None,
         transfer_partners: Optional[List[str]] = None,
@@ -31,46 +32,17 @@ class FlightSearchMCP(FastMCP):
     ) -> str:
         """
         Checks for flight points prices across different platforms.
-
-        Args:
-            origin_airports: List of origin airport IATA codes (e.g., ["SFO", "JFK"]).
-            destination_airports: List of destination airport IATA codes (e.g., ["LAX", "LHR"]).
-            start_date: Start date for the travel search in YYYY-MM-DD format.
-            end_date: End date for the travel date range in YYYY-MM-DD format.
-            programs: List of frequent flyer programs to filter by.
-            alliances: List of airline alliances to filter by.
-            transfer_partners: List of transfer partners to filter by.
-            points_min: Minimum points required for a deal.
-            points_max: Maximum points required for a deal.
-            days: Number of days to search around the specified date.
-
-        Returns:
-            A JSON string with all available deals and the cheapest deal found.
         """
-        loop = asyncio.get_event_loop()
         origin_str = ",".join(origin_airports)
         dest_str = ",".join(destination_airports)
 
         print(f"Searching for flights from {origin_str} to {dest_str} between {start_date} and {end_date}...")
 
-        # Run scrapers in parallel
-        # seats_aero_task = loop.run_in_executor(
-        #     None,
-        #     seats_aero.scrape_seats_aero,
-        #     origin_str,
-        #     dest_str,
-        #     start_date,
-        #     end_date,
-        #     programs,
-        #     alliances,
-        #     transfer_partners,
-        #     points_min,
-        #     points_max,
-        #     days,
-        # )
         all_deals = []
         try:
-            pointsyeah_deals = await pointsyeah.scrape_pointsyeah(origin_str, dest_str, start_date, end_date if end_date else start_date)
+            async with async_playwright() as p:
+                pointsyeah_deals = await pointsyeah.scrape_pointsyeah(p, origin_str, dest_str, start_date, end_date)
+            
             for deal in pointsyeah_deals:
                 deal["source"] = "pointsyeah"
             all_deals.extend(pointsyeah_deals)
@@ -95,7 +67,6 @@ class FlightSearchMCP(FastMCP):
                 merged_deals[deal_id] = deal
             else:
                 existing_deal = merged_deals[deal_id]
-                # Merge cabin data, keeping the best (lowest points)
                 for cabin in ["economy", "premium", "business", "first"]:
                     new_cabin_data = deal.get(cabin)
                     if not new_cabin_data or not new_cabin_data.get("points"):
@@ -108,7 +79,6 @@ class FlightSearchMCP(FastMCP):
                         or new_cabin_data["points"] < existing_cabin_data["points"]
                     ):
                         existing_deal[cabin] = new_cabin_data
-                        # If sources differ, mark as 'multiple'
                         if "source" in existing_deal and existing_deal["source"] != deal.get("source"):
                             existing_deal["source"] = "multiple"
         
@@ -139,47 +109,7 @@ class FlightSearchMCP(FastMCP):
 
         return json.dumps(result, indent=2)
 
-from playwright.async_api import Playwright, async_playwright
-import uvicorn
-
 mcp_server = FlightSearchMCP()
-
-playwright_instance: Optional[Playwright] = None
-
-async def shutdown_scrapers():
-    """Asynchronous part of the cleanup."""
-    print("Shutting down scrapers...")
-    await pointsyeah.close_scraper()
-    # await seats_aero.close_scraper()
-    if playwright_instance:
-        await playwright_instance.stop()
-
-async def startup():
-    """Initializes scrapers."""
-    global playwright_instance
-    playwright_instance = await async_playwright().start()
-    await pointsyeah.initialize_scraper(playwright_instance)
-    # await seats_aero.initialize_scraper(playwright_instance)
-
-async def main_async(args):
-    """The main async function to run the server."""
-    await startup()
-
-    if args.transport == "stdio":
-        print("Running in stdio mode. Note: Graceful shutdown might not be fully configured for this mode.")
-        try:
-            mcp_server.run(transport="stdio")
-        finally:
-            await shutdown_scrapers()
-    elif args.transport == "http":
-        config = uvicorn.Config(mcp_server.app, host="0.0.0.0", port=9999, log_level="info")
-        server = uvicorn.Server(config)
-        print("MCP Server: Starting HTTP server with Uvicorn on 0.0.0.0:9999...")
-        try:
-            await server.serve()
-        finally:
-            print("Server stopped. Shutting down scrapers...")
-            await shutdown_scrapers()
 
 def main():
     print("MCP Server: Starting...")
@@ -187,21 +117,15 @@ def main():
     parser.add_argument(
         "--transport",
         choices=["stdio", "http"],
-        default="stdio",
+        default="http",
         help="The transport protocol to use.",
     )
     args = parser.parse_args()
     print(f"MCP Server: Transport selected: {args.transport}")
 
-    try:
-        asyncio.run(main_async(args))
-    except KeyboardInterrupt:
-        print("\nServer stopped by user.")
-    except Exception as e:
-        print(f"Server failed: {e}")
+    mcp_server.run(transport=args.transport, host="0.0.0.0", port=9999)
     
-    print("MCP Server: Process finished.")
-
+    print("MCP Server: mcp_server.run() has completed.")
 
 if __name__ == "__main__":
     main()
