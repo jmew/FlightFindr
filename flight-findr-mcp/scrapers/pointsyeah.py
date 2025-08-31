@@ -81,20 +81,20 @@ class PointsYeahScraper:
         if not self.page: return
         try:
             print("Navigating to login page...")
-            await self.page.goto("https://www.pointsyeah.com/login", timeout=10000, wait_until="domcontentloaded")
-            await self.page.wait_for_selector('input[name="username"]', state="visible", timeout=10000)
+            await self.page.goto("https://www.pointsyeah.com/login", timeout=120000, wait_until="domcontentloaded")
             
             print("Entering credentials...")
-            await self.page.fill('input[name="username"]', "jepara2048@mogash.com")
-            await self.page.fill('input[name="password"]', "Password1!")
+            # Use actionability waits: Playwright will auto-wait for the element to be ready to be filled.
+            await self.page.locator('input[name="username"]').fill("jepara2048@mogash.com", timeout=12000)
+            await self.page.locator('input[name="password"]').fill("Password1!", timeout=10000)
         
         except Exception as e:
             print(f"An error occurred during initial page load and form fill: {e}")
             try:
                 page_content = await self.page.content()
-                print("--- Page Content on Timeout ---")
+                print("\n--- Page Content on Timeout ---")
                 print(page_content)
-                print("---")
+                print("--- End Page Content---\n")
             except Exception as content_error:
                 print(f"Could not retrieve page content: {content_error}")
             await self.close()

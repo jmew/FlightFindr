@@ -1,0 +1,13 @@
+# Docker ignore
+**/node_modules
+**/dist
+**/__pycache__
+**/.git
+**/.gitignore
+**/.DS_Store
+**/.env
+**/venv
+web-frontend
+Dockerfile
+.dockerignore
+README.md
