@@ -27,21 +27,21 @@ def scrape_seats_aero(origin, destination, start_date, end_date, programs=None, 
 
     print(f"Scraping {search_url}")
 
-    proxies = None
+    proxy = None
     if os.environ.get("NODE_ENV") == "production":
         proxy_url = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
         if proxy_url:
             print("Using proxy for seats.aero in production mode.")
-            proxies = {
+            proxy = {
                 "http": proxy_url,
                 "https": proxy_url,
             }
         else:
             print("Production mode detected, but no proxy URL is set.")
 
-    client = Client(impersonate="safari_17.2.1")
+    client = Client(impersonate="safari_17.2.1", proxy=proxy)
     try:
-        search_response = client.get(search_url, proxies=proxies)
+        search_response = client.get(search_url)
         print(f"seats.aero search response status: {search_response.status_code}")
         if search_response.status_code != 200:
             print(f"seats.aero search response text: {search_response.text}")
@@ -61,7 +61,7 @@ def scrape_seats_aero(origin, destination, start_date, end_date, programs=None, 
     for item in search_data['metadata']:
         enrichment_url = f"https://seats.aero/_api/enrichment_modern/{item['id']}?m=1&min_seats=1&applicable_cabin=any&additional_days_num=1&max_fees=40000&disable_live_filtering=false&date={start_date}&origins={origin}&destinations={destination}"
         try:
-            enrichment_response = client.get(enrichment_url, proxies=proxies)
+            enrichment_response = client.get(enrichment_url)
             if enrichment_response.status_code != 200:
                 print(f"seats.aero enrichment response status for id {item['id']}: {enrichment_response.status_code}")
                 print(f"seats.aero enrichment response text for id {item['id']}: {enrichment_response.text}")
