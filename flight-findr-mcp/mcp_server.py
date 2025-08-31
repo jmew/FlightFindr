@@ -157,26 +157,39 @@ class FlightSearchMCP(FastMCP):
 
         return json.dumps(result, indent=2)
 
+from playwright.async_api import Playwright, async_playwright
 import atexit
 
 mcp_server = FlightSearchMCP()
 
-playwright_instance = None
+# Global variable to hold the Playwright instance
+playwright_instance: Optional[Playwright] = None
 
 def cleanup():
     """Synchronous cleanup function to be called on exit."""
-    global playwright_instance
     print("Shutting down scrapers...")
     if playwright_instance:
         try:
-            asyncio.run(pointsyeah.close_scraper())
-            asyncio.run(seats_aero.close_scraper())
-            asyncio.run(playwright_instance.stop())
+            # Create a new loop to run the async cleanup tasks
+            asyncio.run(shutdown_scrapers())
         except Exception as e:
             print(f"Error during cleanup: {e}")
 
-def main():
+async def shutdown_scrapers():
+    """Asynchronous part of the cleanup."""
+    await pointsyeah.close_scraper()
+    await seats_aero.close_scraper()
+    if playwright_instance:
+        await playwright_instance.stop()
+
+async def startup_scrapers():
+    """Initializes scrapers and sets the global playwright instance."""
     global playwright_instance
+    playwright_instance = await async_playwright().start()
+    await pointsyeah.initialize_scraper(playwright_instance)
+    await seats_aero.initialize_scraper(playwright_instance)
+
+def main():
     print("MCP Server: Starting...")
     parser = argparse.ArgumentParser(description="Run the Flight Search MCP server.")
     parser.add_argument(
@@ -189,15 +202,17 @@ def main():
 
     print(f"MCP Server: Transport selected: {args.transport}")
 
-    atexit.register(cleanup)
-
+    # Initialize scrapers in a single async operation
     try:
-        playwright_instance = asyncio.run(asyncio.create_task(seats_aero.async_playwright().start()))
-        asyncio.run(pointsyeah.initialize_scraper(playwright_instance))
-        asyncio.run(seats_aero.initialize_scraper(playwright_instance))
+        asyncio.run(startup_scrapers())
     except Exception as e:
         print(f"Failed to initialize scrapers: {e}")
+        if playwright_instance:
+            cleanup()
         return
+
+    # Register the cleanup function to be called on exit *after* successful startup
+    atexit.register(cleanup)
 
     if args.transport == "stdio":
         mcp_server.run(transport="stdio")
