@@ -130,6 +130,30 @@ async def shutdown_event():
         await playwright_instance.stop()
     print("Scrapers and Playwright closed.")
 
+async def main_async(args):
+    """Runs startup, the server, and shutdown."""
+    if args.transport == 'stdio':
+        # Fallback for stdio mode, which doesn't use Uvicorn
+        print("Running in stdio mode...")
+        await startup_event()
+        try:
+            mcp_server.run(transport="stdio")
+        finally:
+            await shutdown_event()
+        return
+
+    # HTTP mode
+    await startup_event()
+    
+    app = mcp_server.http_app()
+    config = uvicorn.Config(app, host="0.0.0.0", port=9999, log_level="info")
+    server = uvicorn.Server(config)
+    
+    try:
+        await server.serve()
+    finally:
+        await shutdown_event()
+
 def main():
     parser = argparse.ArgumentParser(description="Run the Flight Search MCP server.")
     parser.add_argument(
@@ -139,28 +163,12 @@ def main():
         help="The transport protocol to use.",
     )
     args = parser.parse_args()
-
-    if args.transport == 'stdio':
-        # Fallback for stdio mode, which doesn't use Uvicorn
-        print("Running in stdio mode...")
-        mcp_server.run(transport="stdio")
-        return
-
-    print("MCP Server: Starting with Uvicorn...")
     
-    # Get the ASGI app from the FastMCP instance
-    app = mcp_server.http_app()
-
-    # Attach startup and shutdown event handlers
-    app.add_event_handler("startup", startup_event)
-    app.add_event_handler("shutdown", shutdown_event)
-
-    # Configure and run the Uvicorn server
-    config = uvicorn.Config(app, host="0.0.0.0", port=9999, log_level="info")
-    server = uvicorn.Server(config)
-    
-    # Uvicorn's run() is blocking and will handle the main event loop
-    server.run()
+    print(f"MCP Server: Starting in {args.transport} mode...")
+    try:
+        asyncio.run(main_async(args))
+    except KeyboardInterrupt:
+        print("\nServer stopped by user.")
     
     print("MCP Server has shut down.")
 
