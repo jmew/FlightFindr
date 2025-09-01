@@ -25,13 +25,15 @@ async function main() {
   });
 
   return new Promise<void>((resolve, reject) => {
-    app
+    const server = app
       .listen(port, () => {
         console.log(`Server is listening on port ${port}`);
       })
       .on('error', (err) => {
         reject(err);
       });
+    // Set a 5-minute timeout for all incoming requests.
+    server.setTimeout(300000);
   });
 }
 
