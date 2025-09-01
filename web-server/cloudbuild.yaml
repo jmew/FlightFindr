@@ -6,6 +6,7 @@ steps:
     - '-t'
     - 'us-central1-docker.pkg.dev/dazzling-lodge-470804-e6/flight-findr-repo/web-server:latest'
     - '.'
+  dir: 'web-server'
 
 # 2. Push the Docker image to Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
