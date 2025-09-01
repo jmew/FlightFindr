@@ -64,7 +64,7 @@ export function useChat() {
     }
 
     const eventSource = new EventSource(
-      `https://flightfindrgeminibackend.onrender.com/chat?message=${encodeURIComponent(
+      `https://web-server-304334704110.us-central1.run.app/chat?message=${encodeURIComponent(
         message,
       )}&sessionId=${sessionIdRef.current}`,
     );
