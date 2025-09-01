@@ -1,0 +1,37 @@
+steps:
+# 1. Build the Docker image
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'build'
+    - '-t'
+    - 'us-central1-docker.pkg.dev/dazzling-lodge-470804-e6/flight-findr-repo/mcp-server:latest'
+    - '.'
+
+# 2. Push the Docker image to Artifact Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'push'
+    - 'us-central1-docker.pkg.dev/dazzling-lodge-470804-e6/flight-findr-repo/mcp-server:latest'
+
+# 3. Deploy the image to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+    - 'run'
+    - 'deploy'
+    - 'mcp-server'
+    - '--image=us-central1-docker.pkg.dev/dazzling-lodge-470804-e6/flight-findr-repo/mcp-server:latest'
+    - '--region=us-central1'
+    - '--platform=managed'
+    - '--allow-unauthenticated'
+    - '--port=9999'
+    - '--timeout=300'
+    - '--cpu=2'
+    - '--memory=2Gi'
+    - '--no-cpu-boost'
+
+images:
+- 'us-central1-docker.pkg.dev/dazzling-lodge-470804-e6/flight-findr-repo/mcp-server:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

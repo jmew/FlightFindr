@@ -30,7 +30,8 @@ export async function getOrCreateClient(sessionId: string) {
   console.log(`Initializing Gemini client for session: ${sessionId}`);
 
   const mcpUrl = process.env.MCP_URL || 'http://localhost:9999/mcp';
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = new Date().toLocaleDateString('en-US');
+  //TODO add users location
   const memoryWithDate = `Today's date is ${today}. ${memory}`;
 
   const configParams: ConfigParameters = {
