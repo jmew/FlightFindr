@@ -88,11 +88,26 @@ export async function chatHandler(req: Request, res: Response) {
       if (toolCallRequests.length > 0) {
         const toolResponseParts: Part[] = [];
         for (const requestInfo of toolCallRequests) {
+          let keepAliveInterval: NodeJS.Timeout | undefined;
+          // Start a keep-alive interval for long-running tools to prevent
+          // the connection from being closed by infrastructure (e.g., Render's load balancer).
+          if (requestInfo.name === 'check_flight_points_prices') {
+            keepAliveInterval = setInterval(() => {
+              // Send an SSE comment as a keep-alive ping.
+              res.write(': keep-alive\n\n');
+            }, 15000); // every 15 seconds
+          }
+
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
             abortController.signal,
           );
+
+          if (keepAliveInterval) {
+            clearInterval(keepAliveInterval);
+          }
+
           console.log('Tool response:', JSON.stringify(toolResponse, null, 2));
           if (toolResponse?.responseParts) {
             // Using `as any` to bypass a strict type check.
