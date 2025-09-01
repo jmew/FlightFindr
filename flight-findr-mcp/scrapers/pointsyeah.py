@@ -121,32 +121,46 @@ class PointsYeahScraper:
             raise Exception("Scraper not initialized properly.")
 
         all_deals = []
+        # Create a Future that will be resolved when the "done" signal is received
+        search_done_future = asyncio.get_running_loop().create_future()
+
         async def handle_response(response):
             if "flight/search/fetch_result" in response.url:
                 try:
                     data = await response.json()
+                    # Check for the done signal
+                    if data.get("data", {}).get("status") == "done":
+                        if not search_done_future.done():
+                            search_done_future.set_result(True)
+                        return
+
                     results = data.get("data", {}).get("result")
                     if data.get("success") and results:
                         print(f"  -> Intercepted {len(results)} deals.")
                         all_deals.extend(results)
                 except Exception as e:
-                    print(f"  -> Could not parse JSON from response: {e}")
+                    if not search_done_future.done():
+                        search_done_future.set_exception(e)
 
         self.page.on("response", handle_response)
 
-        search_url = self._build_search_url(origin, destination, start_date, end_date)
-        print(f"Navigating to search URL: {search_url}")
-        await self.page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
-
-        print("Waiting for search results to load...")
         try:
-            await self.page.wait_for_selector('#nprogress', state='attached', timeout=15000)
-            await self.page.wait_for_selector('#nprogress', state='detached', timeout=90000)
-            print("Search complete.")
-        except TimeoutError:
-            print("Timed out waiting for results. Results may be incomplete.")
+            search_url = self._build_search_url(origin, destination, start_date, end_date)
+            print(f"Navigating to search URL: {search_url}")
+            await self.page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
+
+            print("Waiting for search results to load...")
+            # Wait for the search_done_future to be resolved, with a timeout
+            await asyncio.wait_for(search_done_future, timeout=120) # 2 minute timeout
+            print("Search complete (detected 'done' signal).")
+
+        except asyncio.TimeoutError:
+            print("Timed out waiting for the 'done' signal from the server.")
+        except Exception as e:
+            print(f"An error occurred during scraping: {e}")
+        finally:
+            self.page.remove_listener("response", handle_response)
         
-        self.page.remove_listener("response", handle_response)
         return self._process_deals(all_deals)
 
     def _build_search_url(self, origin: str, destination: str, start_date: str, end_date: str) -> str:
