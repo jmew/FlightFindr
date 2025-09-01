@@ -136,7 +136,7 @@ class PointsYeahScraper:
 
         search_url = self._build_search_url(origin, destination, start_date, end_date)
         print(f"Navigating to search URL: {search_url}")
-        await self.page.goto(search_url, timeout=15000)
+        await self.page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
 
         print("Waiting for search results to load...")
         try:
