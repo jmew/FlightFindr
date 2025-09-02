@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { DataGrid, type SortColumn, type Column } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
-import { FiMaximize } from 'react-icons/fi';
+import { FiMaximize, FiStar } from 'react-icons/fi';
 import FullScreenModal from '../FullScreenModal';
 
 export interface FlightDealRow {
@@ -36,9 +36,23 @@ const columns: readonly Column<FlightDealRow>[] = [
   },
   { key: 'route', name: 'Route', sortable: true, minWidth: 120 },
   { key: 'class', name: 'Class', sortable: true, minWidth: 120 },
-  { key: 'points', name: 'Points', sortable: true, minWidth: 100 },
+  {
+    key: 'points',
+    name: 'Points',
+    sortable: true,
+    minWidth: 100,
+    renderCell: ({ row }: { row: FlightDealRow }) => (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <span>{row.points}</span>
+        {row.transferBonus && row.transferBonus !== 'None' && (
+          <span title={`Transfer Bonus: ${row.transferBonus}`}>
+            <FiStar style={{ color: '#ffc107' }} />
+          </span>
+        )}
+      </div>
+    ),
+  },
   { key: 'fees', name: 'Fees', sortable: true, minWidth: 120 },
-  { key: 'transferBonus', name: 'Transfer Bonus', sortable: true, minWidth: 180 },
   {
     key: 'bookingUrl',
     name: 'Book',
