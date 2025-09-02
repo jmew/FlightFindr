@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { FlightDealRow } from '../components/FlightDealsTable';
-import type { Message, Tool, Deal } from '../types';
+import type { Message, Tool } from '../types';
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -147,43 +147,32 @@ export function useChat() {
                     const parsedResult = JSON.parse(data.result);
                     if (parsedResult.all_deals) {
                       let idCounter = newFlightData.length;
-                      const parsedFlightData = parsedResult.all_deals.flatMap(
-                        (deal: Deal) => {
-                          const common = {
-                            date: new Date(deal.date).toLocaleDateString(),
-                            airline: deal.program,
-                            route: deal.route,
-                            departureTime: new Date(
-                              deal.departure_time,
-                            ).toLocaleTimeString(),
-                            arrivalTime: new Date(
-                              deal.arrival_time,
-                            ).toLocaleTimeString(),
-                            flightNumbers: Array.isArray(deal.flight_numbers)
-                              ? deal.flight_numbers.join(', ')
-                              : '',
-                          };
-                          const rows: FlightDealRow[] = [];
-                          ['economy', 'business', 'first', 'premium'].forEach(
-                            (cls) => {
-                              if (deal[cls]) {
-                                rows.push({
-                                  ...common,
-                                  id: idCounter++,
-                                  class:
-                                    cls.charAt(0).toUpperCase() + cls.slice(1),
-                                  points: deal[cls].points,
-                                  fees: deal[cls].fees,
-                                  bookingUrl: deal[cls].booking_url,
-                                  transferFrom: deal[cls].transfer_info?.map((t: any) => t.bank).join(', ') || 'N/A',
-                                  transferBonus: deal[cls].bonus ? `${deal[cls].bonus.percentage}% from ${deal[cls].bonus.bank}` : 'None',
-                                });
-                              }
-                            },
-                          );
-                          return rows;
-                        },
-                      );
+                      const parsedFlightData = parsedResult.all_deals.flatMap((deal: any) => {
+                        const rows: FlightDealRow[] = [];
+                        const cabinClasses = ['economy', 'premium', 'business', 'first'];
+
+                        cabinClasses.forEach(cabinClass => {
+                          if (deal[cabinClass]) {
+                            const cabinData = deal[cabinClass];
+                            rows.push({
+                              id: idCounter++,
+                              date: deal.date,
+                              airline: deal.program,
+                              route: deal.route,
+                              class: cabinClass.charAt(0).toUpperCase() + cabinClass.slice(1),
+                              points: cabinData.points,
+                              fees: cabinData.fees,
+                              departureTime: deal.departure_time,
+                              arrivalTime: deal.arrival_time,
+                              flightNumbers: 'N/A', // This info is not in the new structure
+                              bookingUrl: cabinData.booking_url,
+                              transferFrom: cabinData.transfer_info?.map((t: any) => t.bank).join(', ') || 'N/A',
+                              transferBonus: cabinData.bonus ? `${cabinData.bonus.percentage}% from ${cabinData.bonus.bank}` : 'None',
+                            });
+                          }
+                        });
+                        return rows;
+                      });
                       newFlightData = [...newFlightData, ...parsedFlightData];
                     }
                   } catch (e) {

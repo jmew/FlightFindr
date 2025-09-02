@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import type { Message } from '../../types';
-import FlightDealsTable from '../FlightDealsTable';
+import FlightDeals from '../FlightDealsTable';
 import ToolCall from '../ToolCall';
 
 interface MessageBubbleProps {
@@ -18,7 +18,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ msg }) => {
       {msg.tools && <ToolCall tools={msg.tools} />}
       {msg.flightData && msg.flightData.length > 0 && (
         <div className="flight-deals-container">
-          <FlightDealsTable deals={msg.flightData} />
+          <FlightDeals deals={msg.flightData} />
         </div>
       )}
     </div>

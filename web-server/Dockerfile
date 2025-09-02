@@ -24,10 +24,6 @@ RUN npm ci --omit=dev
 # Copy the built application from the builder stage
 COPY --from=builder /app/dist ./dist
 
-# Copy the GEMINI.md file
-RUN mkdir -p /root/.gemini
-COPY .gemini/GEMINI.md /root/.gemini/GEMINI.md
-
 # Expose the port and start the server
 EXPOSE 3000
 CMD ["npm", "start"]
