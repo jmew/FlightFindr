@@ -1,9 +1,59 @@
-You are an AI travel assistant specializing in points and miles. Your primary function is to help users find the best award flight deals using their credit card points and airline miles. Your secondary function is to help them plan the rest of their trip, including accommodations and activities.
+### Project Overview
 
-When asked to find the best flight, always provide a nice easy to read table of all the flight points options that are good deals. Each row should be the flight itinerary (esp calling out if theres layovers), and there should be a second column which shows the flight deal in points and fees, and the last column should show where to book to find the points deal.
+This is a full-stack application designed to find flight deals using points. It consists of three main services:
+-   `web-frontend`: A React-based user interface.
+-   `web-server`: A Node.js/Express backend that orchestrates calls to the Gemini API.
+-   `flight-findr-mcp`: A Python-based MCP server that performs the actual web scraping.
 
-The table should have all the flights sorted by best deal to worst deal, and the flight itinerary should include the date and time of departure as well as arrival like 4:52PM -> 6:01PM  (calling out if its a different date as well). Just think about how flights are shown on google flights and use that same design pattern. The goal is to make it easy for the user to identify the best flight.
+### Development Workflow
 
-There should be a horizontal line between each row as well to make it easier to read
+To run the services locally for development:
 
-The table will also be outputted onto a mac terminal so make it look nice there
+-   **Frontend:** Navigate to `web-frontend/` and run `npm run dev`. This uses Vite and supports hot-reloading.
+-   **Backend:** Navigate to `web-server/` and run `npm run dev`. This uses `tsx` to watch for changes and automatically restart the server.
+-   **Scraper (MCP Server):** The most reliable way to test the scraper is to run its test script directly. From the project root, run:
+    ```bash
+    flight-findr-mcp/venv/bin/python flight-findr-mcp/scrapers/pointsyeah.py
+    ```
+
+### Deployment
+
+-   The services are designed to be deployed to **Google Cloud Run**.
+-   Deployment is automated via **Google Cloud Build triggers** that watch the `main` branch of the GitHub repository.
+-   Each service (`web-server`, `flight-findr-mcp`) has its own `cloudbuild.yaml` file that defines its build and deploy steps.
+-   **IMPORTANT:** The `GEMINI_API_KEY` is a secret. It is configured as a **Substitution Variable** in the Cloud Build trigger for the `web-server` and should **NEVER** be committed to the `cloudbuild.yaml` file.
+
+### Key Learnings & Conventions
+
+This project has specific behaviors and solutions that are critical to its operation.
+
+1.  **Scraper Login Logic is Sensitive:**
+    *   The login process on `pointsyeah.com` appears to be sensitive to some automation patterns.
+    *   In our testing, we found that using explicit waiting logic after the login click (e.g., `page.wait_for_url()` or waiting for error text) consistently failed, suggesting it might be detected by anti-bot measures.
+    *   The most reliable method we found was to use a simple, fixed `asyncio.sleep(3)` after clicking. This "dumb" wait proved more effective than active polling. While a more event-driven approach might be possible if implemented carefully, be aware of this sensitivity. Before changing the login flow, test it thoroughly to ensure it doesn't re-introduce the timeout failures.
+
+2.  **Scraper Search Completion:**
+    *   To detect when a flight search is complete, the scraper now waits for a specific network response containing `{"data": {"status": "done"}}`.
+    *   This is much more reliable than waiting for UI elements like progress bars. This logic is located in the `scrape()` method of `pointsyeah.py`.
+
+3.  **Server Timeouts on Cloud Platforms:**
+    *   Long-running scraper requests (> 60 seconds) will cause timeouts on cloud platforms like Render or Cloud Run due to load balancer or server defaults.
+    *   The fix is two-fold and located in the `web-server`:
+        1.  The Node.js HTTP server timeout is explicitly increased to 5 minutes in `src/index.ts`.
+        2.  A keep-alive ping (SSE comment) is sent every 15 seconds during a tool call in `src/chatHandler.ts` to keep the browser-to-server connection from being closed by network infrastructure.
+
+4.  **MCP Server Lifecycle:**
+    *   The `fastmcp` library does not appear to support the ASGI `lifespan` protocol for startup/shutdown events.
+    *   Therefore, the `mcp_server.py` manages the Playwright lifecycle manually within its `main_async` function, starting the browser before the server runs and using a `try...finally` block to guarantee it closes on shutdown.
+
+### **CRITICAL: Final Verification Steps**
+
+1.  **Scraper:** Before claiming any task involving the `flight-findr-mcp` scraper is complete, you **must** run the local test script to verify your changes have not caused a regression.
+    ```bash
+    flight-findr-mcp/venv/bin/python flight-findr-mcp/scrapers/pointsyeah.py
+    ```
+2.  **Frontend/Backend:** After making changes to `web-frontend` or `web-server`, you **must** run `npm run build` within the respective directory to ensure there are no build or type errors.
+
+### Committing Changes
+
+After any change is confirmed to be working correctly (especially after a successful local test or build), make a `git add` and `git commit` to save the progress. This creates a stable checkpoint and is a critical best practice.

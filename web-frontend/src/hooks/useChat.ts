@@ -63,8 +63,9 @@ export function useChat() {
       return;
     }
 
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://web-server-304334704110.us-central1.run.app';
     const eventSource = new EventSource(
-      `https://web-server-304334704110.us-central1.run.app/chat?message=${encodeURIComponent(
+      `${baseUrl}/chat?message=${encodeURIComponent(
         message,
       )}&sessionId=${sessionIdRef.current}`,
     );
@@ -173,6 +174,9 @@ export function useChat() {
                                     cls.charAt(0).toUpperCase() + cls.slice(1),
                                   points: deal[cls].points,
                                   fees: deal[cls].fees,
+                                  bookingUrl: deal[cls].booking_url,
+                                  transferFrom: deal[cls].transfer_info?.map((t: any) => t.bank).join(', ') || 'N/A',
+                                  transferBonus: deal[cls].bonus ? `${deal[cls].bonus.percentage}% from ${deal[cls].bonus.bank}` : 'None',
                                 });
                               }
                             },

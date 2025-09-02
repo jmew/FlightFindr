@@ -20,7 +20,16 @@ const MessageList: React.FC<MessageListProps> = ({
     ))}
     {isLoading && (
       <div className="thought-display">
-        <div className="spinner" />
+        <svg className="spinner" viewBox="0 0 50 50">
+          <circle
+            className="path"
+            cx="25"
+            cy="25"
+            r="20"
+            fill="none"
+            strokeWidth="4"
+          />
+        </svg>
         {thought && (
           <span className="thought">
             {thought} ({elapsedTime}s, This may take up to 2 minutes...)

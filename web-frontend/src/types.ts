@@ -23,8 +23,8 @@ export interface Deal {
   departure_time: string;
   arrival_time: string;
   flight_numbers: string[];
-  economy?: { points: number; fees: string };
-  business?: { points: number; fees: string };
-  first?: { points: number; fees: string };
-  premium?: { points: number; fees: string };
+  economy?: { points: number; fees: string; booking_url: string; transfer_info: any[], bonus: any };
+  business?: { points: number; fees: string; booking_url: string; transfer_info: any[], bonus: any };
+  first?: { points: number; fees: string; booking_url: string; transfer_info: any[], bonus: any };
+  premium?: { points: number; fees: string; booking_url: string; transfer_info: any[], bonus: any };
 }

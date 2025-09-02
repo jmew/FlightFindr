@@ -46,6 +46,19 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   const [suggestionIndex, setSuggestionIndex] = useState(0);
 
   useEffect(() => {
+    // Prevent body scroll on mobile when the welcome screen is visible.
+    if (isChatEmpty && window.innerWidth <= 768) {
+      document.body.classList.add('empty-chat-mobile-lock');
+    } else {
+      document.body.classList.remove('empty-chat-mobile-lock');
+    }
+    // Cleanup function to remove the class when the component unmounts
+    return () => {
+      document.body.classList.remove('empty-chat-mobile-lock');
+    };
+  }, [isChatEmpty]);
+
+  useEffect(() => {
     if (isChatEmpty) {
       const interval = setInterval(() => {
         setSuggestionIndex((prev) => (prev + 1) % placeholderSuggestions.length);

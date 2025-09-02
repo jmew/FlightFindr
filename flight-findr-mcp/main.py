@@ -1,13 +1,13 @@
 import argparse
-from scrapers import seats_aero, pointsyeah
 import sys
 import asyncio
+from playwright.async_api import async_playwright
+from scrapers import seats_aero, pointsyeah
 from cash_price import get_flight_cash_prices, normalize_program_name, parse_time
-
 
 async def main():
     """
-    Main function to run the flight deal finder.
+    Main asynchronous function to run the flight deal finder.
     """
     parser = argparse.ArgumentParser(description="Find the best flight deals using points.")
     parser.add_argument("origin", nargs='+', help="One or more origin airport IATA codes (e.g., SFO JFK)")
@@ -22,7 +22,7 @@ async def main():
     parser.add_argument("--points_min", type=int, help="Minimum points required for a deal.")
     parser.add_argument("--points_max", type=int, help="Maximum points required for a deal.")
     parser.add_argument("--days", type=int, help="Number of days to search around the specified date.")
-    parser.add_argument("--source", default="seats.aero", choices=["seats.aero", "pointsyeah", "all"], help="The data source to use.")
+    parser.add_argument("--source", default="pointsyeah", choices=["seats.aero", "pointsyeah", "all"], help="The data source to use.")
 
     args = parser.parse_args()
     
@@ -31,64 +31,49 @@ async def main():
 
     print(f"Searching for flights from {origin_airports} to {destination_airports} between {args.start_date} and {args.end_date} using {args.source}...")
     
-    loop = asyncio.get_running_loop()
     deals = []
-    try:
-        if args.source == "seats.aero":
-            deals = await loop.run_in_executor(
-                None,
-                lambda: seats_aero.scrape_seats_aero(
-                    origin_airports, 
-                    destination_airports, 
-                    args.start_date, 
-                    args.end_date,
-                    programs=args.programs,
-                    alliances=args.alliances,
-                    transfer_partners=args.transfer_partners,
-                    points_min=args.points_min,
-                    points_max=args.points_max,
-                    days=args.days
-                )
-            )
-        elif args.source == "pointsyeah":
-            deals = await loop.run_in_executor(
-                None,
-                lambda: pointsyeah.scrape_pointsyeah(
-                    origin_airports, 
-                    destination_airports, 
-                    args.start_date, 
-                    args.end_date
-                )
-            )
-        elif args.source == "all":
-            seats_aero_task = loop.run_in_executor(
-                None,
-                lambda: seats_aero.scrape_seats_aero(
+    async with async_playwright() as playwright:
+        # Initialize scrapers that need a playwright instance
+        await seats_aero.initialize_scraper(playwright)
+        await pointsyeah.initialize_scraper(playwright)
+
+        try:
+            if args.source == "seats.aero":
+                deals = await seats_aero.scrape_seats_aero(
                     origin_airports, destination_airports, args.start_date, args.end_date,
                     programs=args.programs, alliances=args.alliances, transfer_partners=args.transfer_partners,
                     points_min=args.points_min, points_max=args.points_max, days=args.days
                 )
-            )
-            pointsyeah_task = loop.run_in_executor(
-                None,
-                lambda: pointsyeah.scrape_pointsyeah(
+            elif args.source == "pointsyeah":
+                deals = await pointsyeah.scrape_pointsyeah(
                     origin_airports, destination_airports, args.start_date, args.end_date
                 )
-            )
-            seats_aero_deals = await seats_aero_task
-            pointsyeah_deals = await pointsyeah_task
-            deals = (seats_aero_deals or []) + (pointsyeah_deals or [])
+            elif args.source == "all":
+                seats_aero_task = seats_aero.scrape_seats_aero(
+                    origin_airports, destination_airports, args.start_date, args.end_date,
+                    programs=args.programs, alliances=args.alliances, transfer_partners=args.transfer_partners,
+                    points_min=args.points_min, points_max=args.points_max, days=args.days
+                )
+                pointsyeah_task = pointsyeah.scrape_pointsyeah(
+                    origin_airports, destination_airports, args.start_date, args.end_date
+                )
+                results = await asyncio.gather(seats_aero_task, pointsyeah_task, return_exceptions=True)
+                seats_aero_deals = results[0] if not isinstance(results[0], Exception) else []
+                pointsyeah_deals = results[1] if not isinstance(results[1], Exception) else []
+                deals = (seats_aero_deals or []) + (pointsyeah_deals or [])
 
-
-    except Exception as e:
-        print(f"Error scraping {args.source}: {e}", file=sys.stderr)
-        deals = []
+        except Exception as e:
+            print(f"Error scraping {args.source}: {e}", file=sys.stderr)
+            deals = []
+        finally:
+            await seats_aero.close_scraper()
+            await pointsyeah.close_scraper()
 
     if not deals:
         print("No deals found.")
         return
 
-    # Deduplicate deals
+    # Deduplicate and merge deals
     merged_deals = {}
     for deal in deals:
         normalized_program = normalize_program_name(deal.get("program"))
@@ -106,7 +91,6 @@ async def main():
             merged_deals[deal_id] = deal
         else:
             existing_deal = merged_deals[deal_id]
-            # Merge cabin data, keeping the best (lowest points)
             for cabin in ["economy", "premium", "business", "first"]:
                 new_cabin_data = deal.get(cabin)
                 if not new_cabin_data or not new_cabin_data.get("points"):
@@ -122,7 +106,6 @@ async def main():
     
     unique_deals = list(merged_deals.values())
 
-
     # Enrich deals with cash prices and CPP
     cash_price_tasks = []
     for deal in unique_deals:
@@ -131,16 +114,8 @@ async def main():
     
     await asyncio.gather(*cash_price_tasks)
 
-
-    # Sort deals from best to worst based on lowest points in any cabin
-    def get_best_points(deal):
-        # Check cabins in order of preference
-        for cabin in ['economy', 'premium', 'business', 'first']:
-            if deal.get(cabin) and deal[cabin].get('points'):
-                return deal[cabin]['points']
-        return float('inf')  # Put deals with no points at the end
-
-    unique_deals.sort(key=get_best_points)
+    # Sort and print deals
+    unique_deals.sort(key=lambda d: min((c.get('points', float('inf')) for c in (d.get(cab) for cab in ['economy', 'premium', 'business', 'first']) if c), default=float('inf')))
 
     for i, deal in enumerate(unique_deals):
         print(f"--- Deal #{i+1} ---")

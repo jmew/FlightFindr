@@ -20,13 +20,17 @@ body {
   color: var(--gem-sys-color--on-surface);
 }
 
+/* On mobile, when chat is empty, explicitly prevent body scroll */
+body.empty-chat-mobile-lock {
+  overflow: hidden;
+}
+
 /* Main App Layout */
 .chat-app {
   display: flex;
   justify-content: center;
   height: 100vh;
   width: 100%;
-  overflow-y: auto;
 }
 
 .main-content {
@@ -35,9 +39,8 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding-top: 60px;
-  padding-bottom: 60px;
   box-sizing: border-box;
+  overflow: hidden; /* Prevent this container from scrolling */
 }
 
 .main-content.empty-chat {
@@ -73,13 +76,15 @@ body {
   color: var(--gem-sys-color--primary);
 }
 
-/* Chat Conversation */
+/* Chat Conversation - this is the scrollable part */
 .chat-conversation {
-  flex-grow: 1;
-  padding: var(--gem-sys-spacing--l);
+  flex-grow: 1; /* Takes up all available space */
+  padding: 0 var(--gem-sys-spacing--l);
   display: flex;
   flex-direction: column;
   gap: var(--gem-sys-spacing--l);
+  overflow-y: auto; /* Allow this section to scroll */
+  padding-top: 60px;
 }
 
 .message {
@@ -95,6 +100,10 @@ body {
   color: var(--gem-sys-color--surface);
   align-self: flex-end;
   border-top-right-radius: 4px;
+}
+
+.user-message p {
+  margin-top: 1em;
 }
 
 .bot-message {
@@ -114,6 +123,22 @@ body {
 .input-area {
   padding: var(--gem-sys-spacing--l);
   position: relative;
+  flex-shrink: 0; /* Prevent it from shrinking */
+  padding-top: 24px;
+  padding-bottom: 60px;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+  .chat-conversation {
+    padding: 16px;
+    padding-top: 20px;
+  }
+  .input-area {
+    padding: 16px;
+    padding-bottom: 20px;
+    background-color: var(--gem-sys-color--surface);
+  }
 }
 
 .suggestion-bubbles-container {
@@ -171,6 +196,7 @@ body {
 .send-button:disabled {
   background-color: var(--gem-sys-color--surface-container);
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .stop-button {
@@ -203,19 +229,37 @@ body {
 
 /* Loading Spinner and Thought */
 .spinner {
-  border: 2px solid var(--gem-sys-color--on-surface-variant);
-  border-top: 2px solid var(--gem-sys-color--primary);
-  border-radius: 50%;
-  width: 16px;
-  height: 16px;
-  animation: spin 1s linear infinite;
-  display: inline-block;
+  animation: rotate 2s linear infinite;
+  width: 24px;
+  height: 24px;
   margin-right: 10px;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.spinner .path {
+  stroke: var(--gem-sys-color--primary);
+  stroke-linecap: round;
+  animation: dash 1.5s ease-in-out infinite;
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
 }
 
 .thought {

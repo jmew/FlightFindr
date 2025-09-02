@@ -44,3 +44,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Environment-specific files
+.env.development
+.env.local

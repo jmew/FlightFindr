@@ -121,14 +121,13 @@ class PointsYeahScraper:
             raise Exception("Scraper not initialized properly.")
 
         all_deals = []
-        # Create a Future that will be resolved when the "done" signal is received
-        search_done_future = asyncio.get_running_loop().create_future()
+        loop = asyncio.get_running_loop()
+        search_done_future = loop.create_future()
 
         async def handle_response(response):
             if "flight/search/fetch_result" in response.url:
                 try:
                     data = await response.json()
-                    # Check for the done signal
                     if data.get("data", {}).get("status") == "done":
                         if not search_done_future.done():
                             search_done_future.set_result(True)
@@ -136,7 +135,6 @@ class PointsYeahScraper:
 
                     results = data.get("data", {}).get("result")
                     if data.get("success") and results:
-                        print(f"  -> Intercepted {len(results)} deals.")
                         all_deals.extend(results)
                 except Exception as e:
                     if not search_done_future.done():
@@ -146,14 +144,9 @@ class PointsYeahScraper:
 
         try:
             search_url = self._build_search_url(origin, destination, start_date, end_date)
-            print(f"Navigating to search URL: {search_url}")
             await self.page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
-
-            print("Waiting for search results to load...")
-            # Wait for the search_done_future to be resolved, with a timeout
-            await asyncio.wait_for(search_done_future, timeout=120) # 2 minute timeout
+            await asyncio.wait_for(search_done_future, timeout=120)
             print("Search complete (detected 'done' signal).")
-
         except asyncio.TimeoutError:
             print("Timed out waiting for the 'done' signal from the server.")
         except Exception as e:
@@ -187,7 +180,9 @@ class PointsYeahScraper:
             if not deal.get("routes"): continue
             program_name, deal_date = deal.get("program"), deal.get("date")
             route_str = f"{deal.get('departure')} -> {deal.get('arrival')}"
+
             for route in deal["routes"]:
+                booking_url = route.get("url", "") # Explicitly get URL from the route
                 payment = route.get("payment", {})
                 cabin, points = payment.get("cabin", "").lower(), payment.get("miles")
                 if not cabin or points is None: continue
@@ -195,6 +190,20 @@ class PointsYeahScraper:
                 if not segments: continue
                 departure_time, arrival_time = segments[0].get("dt"), segments[-1].get("at")
                 deal_key = (program_name, deal_date, route_str, departure_time, arrival_time)
+
+                # Extract transfer info
+                transfer_info = route.get("transfer", [])
+                bonus_info = None
+                if transfer_info:
+                    for transfer in transfer_info:
+                        if transfer.get("bonus_percentage", 0) > 0:
+                            bonus_info = {
+                                "bank": transfer.get("bank"),
+                                "percentage": transfer.get("bonus_percentage"),
+                                "end_date": transfer.get("bonus_end_date")
+                            }
+                            break # Assume one bonus is enough to highlight
+
                 if deal_key not in best_deals:
                     best_deals[deal_key] = {
                         "program": program_name, "route": route_str, "date": deal_date,
@@ -202,12 +211,18 @@ class PointsYeahScraper:
                         "direct": len(segments) == 1, "economy": None, "premium": None,
                         "business": None, "first": None
                     }
+                
                 cabin_key = "premium" if "premium" in cabin else "business" if "business" in cabin else "first" if "first" in cabin else "economy"
                 current_best = best_deals[deal_key].get(cabin_key)
+
                 if current_best is None or points < current_best['points']:
                     best_deals[deal_key][cabin_key] = {
-                        "points": points, "fees": f"${payment.get('tax')} {payment.get('currency')}",
-                        "seats": payment.get("seats")
+                        "points": points, 
+                        "fees": f"${payment.get('tax')} {payment.get('currency')}",
+                        "seats": payment.get("seats"),
+                        "booking_url": booking_url,
+                        "transfer_info": transfer_info,
+                        "bonus": bonus_info
                     }
         return list(best_deals.values())
 
