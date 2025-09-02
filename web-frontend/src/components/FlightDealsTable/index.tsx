@@ -18,6 +18,7 @@ export interface FlightDealRow {
   bookingUrl: string;
   transferFrom: string;
   transferBonus: string;
+  duration: number;
   isBestDeal?: boolean;
 }
 
@@ -29,17 +30,10 @@ const DealCard = ({ deal }: DealCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const transferPartners = deal.transferFrom ? deal.transferFrom.split(',').map(p => p.trim()) : [];
 
-  const getDuration = (start: string, end: string) => {
-    try {
-      const startDate = new Date(start);
-      const endDate = new Date(end);
-      const diff = endDate.getTime() - startDate.getTime();
-      const hours = Math.floor(diff / 3600000);
-      const minutes = Math.floor((diff % 3600000) / 60000);
-      return `${hours}h ${minutes}m`;
-    } catch (e) {
-      return '';
-    }
+  const getDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return `${hours}h ${mins}m`;
   };
 
   const stops = deal.flightNumbers ? deal.flightNumbers.split(',').length - 1 : 0;
@@ -107,7 +101,7 @@ const DealCard = ({ deal }: DealCardProps) => {
             <strong>Arrival:</strong> {new Date(deal.arrivalTime).toLocaleString()}
           </div>
           <div className="detail-item">
-            <strong>Duration:</strong> {getDuration(deal.departureTime, deal.arrivalTime)}
+            <strong>Duration:</strong> {getDuration(deal.duration)}
           </div>
           <div className="detail-item">
             <strong>Stops:</strong> {stops > 0 ? `${stops} stop(s)` : 'Nonstop'}

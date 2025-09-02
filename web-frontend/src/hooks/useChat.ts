@@ -164,7 +164,8 @@ export function useChat() {
                               fees: cabinData.fees,
                               departureTime: deal.departure_time,
                               arrivalTime: deal.arrival_time,
-                              flightNumbers: 'N/A', // This info is not in the new structure
+                              duration: deal.duration_minutes,
+                              flightNumbers: deal.flight_numbers.join(', '),
                               bookingUrl: cabinData.booking_url,
                               transferFrom: cabinData.transfer_info?.map((t: any) => t.bank).join(', ') || 'N/A',
                               transferBonus: cabinData.bonus ? `${cabinData.bonus.percentage}% from ${cabinData.bonus.bank}` : 'None',

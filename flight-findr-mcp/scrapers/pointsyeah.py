@@ -3,6 +3,7 @@ import json
 import asyncio
 import os
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 
 class PointsYeahScraper:
     """
@@ -188,7 +189,13 @@ class PointsYeahScraper:
                 if not cabin or points is None: continue
                 segments = route.get("segments", [])
                 if not segments: continue
-                departure_time, arrival_time = segments[0].get("dt"), segments[-1].get("at")
+                
+                valid_segments = [s for s in segments if s.get("flight_number")]
+                if not valid_segments:
+                    continue
+
+                flight_numbers = [s.get("flight_number") for s in valid_segments]
+                departure_time, arrival_time = valid_segments[0].get("dt"), valid_segments[-1].get("at")
                 deal_key = (program_name, deal_date, route_str, departure_time, arrival_time)
 
                 # Extract transfer info
@@ -208,8 +215,10 @@ class PointsYeahScraper:
                     best_deals[deal_key] = {
                         "program": program_name, "route": route_str, "date": deal_date,
                         "departure_time": departure_time, "arrival_time": arrival_time,
-                        "direct": len(segments) == 1, "economy": None, "premium": None,
-                        "business": None, "first": None
+                        "duration_minutes": route.get("duration", 0),
+                        "direct": len(valid_segments) == 1, "economy": None, "premium": None,
+                        "business": None, "first": None,
+                        "flight_numbers": flight_numbers
                     }
                 
                 cabin_key = "premium" if "premium" in cabin else "business" if "business" in cabin else "first" if "first" in cabin else "economy"
@@ -267,15 +276,10 @@ async def main_test():
     try:
         await initialize_scraper(playwright)
         
-        print("--- First Search ---")
-        deals1 = await scrape_pointsyeah("JFK", "SFO", "2025-10-10", "2025-10-10")
-        if deals1:
-            print(f"Found {len(deals1)} deals.")
-        
-        print("\n--- Second Search (should be much faster) ---")
-        deals2 = await scrape_pointsyeah("LAX", "HNL", "2025-11-15", "2025-11-15")
-        if deals2:
-            print(f"Found {len(deals2)} deals.")
+        deals = await scrape_pointsyeah("SEA", "JFK", "2025-10-04", "2025-10-04")
+        if deals:
+            print(f"Found {len(deals)} deals.")
+            print(json.dumps(deals, indent=2))
 
     finally:
         await close_scraper()
