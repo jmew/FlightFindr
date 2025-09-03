@@ -152,41 +152,45 @@ const DealFilters: React.FC<DealFiltersProps> = ({
     setCurrentMax(maxPoints);
   }
 
-  return (
-    <div className="deal-filters-container">
-      <div className="filter-chips-scroll-container">
-        <FilterChip
-          label="Stops"
-          options={['Nonstop', '1 Stop', '2+ Stops']}
-          selectedOptions={filters.stops}
-          onChange={(selected) => handleFilterChange('stops', selected)}
-          onClear={() => handleFilterChange('stops', [])}
-          isActive={filters.stops.length > 0}
-        />
-        <FilterChip
-          label="Airlines"
-          options={availablePrograms}
-          selectedOptions={filters.airlinePrograms}
-          onChange={(selected) => handleFilterChange('airlinePrograms', selected)}
-          onClear={() => handleFilterChange('airlinePrograms', [])}
-          isActive={filters.airlinePrograms.length > 0}
-        />
-        <FilterChip
-          label="Cabins"
-          options={['Economy', 'Premium', 'Business', 'First']}
-          selectedOptions={filters.cabinClasses}
-          onChange={(selected) => handleFilterChange('cabinClasses', selected)}
-          onClear={() => handleFilterChange('cabinClasses', [])}
-          isActive={filters.cabinClasses.length > 0}
-        />
-        <FilterChip
-          label="Price"
-          selectedOptions={isPriceActive ? [currentMax.toLocaleString()] : []}
-          onChange={() => {}}
-          onClear={handlePriceClear}
-          isActive={isPriceActive}
-        >
-          <Form.Label>Max Points: {currentMax.toLocaleString()}</Form.Label>
+  const filtersConfig = [
+    {
+      id: 'stops',
+      label: 'Stops',
+      options: ['Nonstop', '1 Stop', '2+ Stops'],
+      selectedOptions: filters.stops,
+      onChange: (selected: string[]) => handleFilterChange('stops', selected),
+      onClear: () => handleFilterChange('stops', []),
+      isActive: filters.stops.length > 0,
+      isMultiSelect: false,
+    },
+    {
+      id: 'airlines',
+      label: 'Airlines',
+      options: availablePrograms,
+      selectedOptions: filters.airlinePrograms,
+      onChange: (selected: string[]) => handleFilterChange('airlinePrograms', selected),
+      onClear: () => handleFilterChange('airlinePrograms', []),
+      isActive: filters.airlinePrograms.length > 0,
+    },
+    {
+      id: 'cabins',
+      label: 'Cabins',
+      options: ['Economy', 'Premium', 'Business', 'First'],
+      selectedOptions: filters.cabinClasses,
+      onChange: (selected: string[]) => handleFilterChange('cabinClasses', selected),
+      onClear: () => handleFilterChange('cabinClasses', []),
+      isActive: filters.cabinClasses.length > 0,
+    },
+    {
+      id: 'price',
+      label: 'Price',
+      selectedOptions: isPriceActive ? [currentMax.toLocaleString()] : [],
+      onChange: () => {},
+      onClear: handlePriceClear,
+      isActive: isPriceActive,
+      children: (
+        <>
+          <Form.Label className="price-filter-label">Max Points: {currentMax.toLocaleString()}</Form.Label>
           <Form.Range
             min={minPoints}
             max={maxPoints}
@@ -195,20 +199,42 @@ const DealFilters: React.FC<DealFiltersProps> = ({
             onMouseUp={handleSliderMouseUp}
             onTouchEnd={handleSliderMouseUp}
           />
-        </FilterChip>
-      </div>
-      <div className="filter-group">
-        <select
-          className="sort-select"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-        >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          <div className="price-range-labels">
+            <span>{minPoints.toLocaleString()}</span>
+            <span>{maxPoints.toLocaleString()}</span>
+          </div>
+        </>
+      ),
+    },
+    {
+      id: 'sort',
+      label: 'Sort By',
+      options: SORT_OPTIONS.map(o => o.label),
+      selectedOptions: [SORT_OPTIONS.find(o => o.value === sortBy)?.label || ''],
+      onChange: (selected: string[]) => {
+        const selectedValue = SORT_OPTIONS.find(o => o.label === selected[0])?.value;
+        if (selectedValue) {
+          setSortBy(selectedValue);
+        }
+      },
+      onClear: () => setSortBy('top'),
+      isActive: sortBy !== 'top',
+      isMultiSelect: false,
+    },
+  ];
+
+  const activeFilters = filtersConfig.filter(f => f.isActive);
+  const inactiveFilters = filtersConfig.filter(f => !f.isActive);
+
+  return (
+    <div className="deal-filters-container">
+      <div className="filter-chips-scroll-container">
+        {inactiveFilters.map(filter => (
+          <FilterChip key={filter.id} {...filter} />
+        ))}
+        {activeFilters.map(filter => (
+          <FilterChip key={filter.id} {...filter} />
+        ))}
       </div>
     </div>
   );

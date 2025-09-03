@@ -300,7 +300,25 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
   }, [dealsWithCabin, filters]);
 
   const sortedDeals = useMemo(() => {
-    return [...filteredDeals].sort((a, b) => {
+    const dealsWithScores = filteredDeals.map((deal) => ({
+      ...deal,
+      score: calculateTopFlightScore(
+        deal as FlightDeal,
+        minPoints,
+        shortestDuration,
+      ),
+    }));
+
+    if (sortBy === 'top') {
+      const sortedByScore = [...dealsWithScores].sort((a, b) => a.score - b.score);
+      if (sortedByScore.length > 20) {
+        const percentileIndex = Math.floor(sortedByScore.length * 0.65);
+        return sortedByScore.slice(0, percentileIndex + 1);
+      }
+      return sortedByScore;
+    }
+
+    return [...dealsWithScores].sort((a, b) => {
       const aCabin = a.displayCabin as
         | 'economy'
         | 'premium'
@@ -312,12 +330,6 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
         | 'business'
         | 'first';
 
-      if (sortBy === 'top') {
-        const aScore = calculateTopFlightScore(a as FlightDeal, minPoints, shortestDuration);
-        const bScore = calculateTopFlightScore(b as FlightDeal, minPoints, shortestDuration);
-        return aScore - bScore;
-      }
-      
       if (sortBy === 'points') {
         const aData = a[aCabin];
         const bData = b[bCabin];

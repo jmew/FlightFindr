@@ -304,7 +304,6 @@ body.empty-chat-mobile-lock {
 /* Tool Call & Flight Data Styles */
 .tool-call-card, .flight-deals-container {
   background-color: var(--gem-sys-color--surface);
-  border: 1px solid var(--gem-sys-color--surface-container);
   border-radius: 10px;
   padding: var(--gem-sys-spacing--m);
   margin-top: var(--gem-sys-spacing--s);
@@ -678,10 +677,8 @@ body.empty-chat-mobile-lock {
 .filter-chips-scroll-container {
   display: flex;
   gap: 8px;
-  overflow-x: auto;
   flex-grow: 1;
   scrollbar-width: none; /* Firefox */
-  flex-wrap: wrap;
 }
 
 .filter-chips-scroll-container::-webkit-scrollbar {
@@ -728,7 +725,14 @@ body.empty-chat-mobile-lock {
 }
 
 .filter-chip-dropdown .dropdown-item-text {
-  padding: 0.5rem 1rem;
+  color: rgb(232, 234, 237);
+  cursor: pointer;
+  font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  line-height: 20px;
+  padding: 5px 4px;
 }
 
 .filter-chip-dropdown .form-check-input:checked {
@@ -737,7 +741,10 @@ body.empty-chat-mobile-lock {
 }
 
 .filter-chip-dropdown .form-check-label {
-  color: var(--gem-sys-color--on-surface);
+  color: rgb(232, 234, 237);
+  font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .sort-select {
@@ -766,4 +773,16 @@ body.empty-chat-mobile-lock {
 .bank-logo {
   font-size: 20px; /* Slightly smaller for bank logos */
   color: #003B73; /* Default Citi color */
+}
+
+.price-filter-label {
+  color: rgb(232, 234, 237);
+  font-size: 10px;
+}
+
+.price-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  color: rgb(232, 234, 237);
 }
