@@ -166,6 +166,20 @@ class PointsYeahScraper:
                 if not valid_segments:
                     continue
 
+                stops = [s.get('aa') for s in valid_segments[:-1]]
+                airlines = list(set([s.get('flight_number')[:2] for s in valid_segments if s.get('flight_number')]))
+
+                # Check for overnight layovers and calculate layover duration
+                overnight_layover = False
+                layover_duration = 0
+                if len(valid_segments) > 1:
+                    for i in range(len(valid_segments) - 1):
+                        arrival_time = datetime.fromisoformat(valid_segments[i].get('at'))
+                        departure_time = datetime.fromisoformat(valid_segments[i+1].get('dt'))
+                        if arrival_time.date() != departure_time.date():
+                            overnight_layover = True
+                        layover_duration += (departure_time - arrival_time).total_seconds() / 60
+
                 flight_numbers = [s.get("flight_number") for s in valid_segments]
                 departure_time, arrival_time = valid_segments[0].get("dt"), valid_segments[-1].get("at")
                 deal_key = (program_name, deal_date, route_str, departure_time, arrival_time)
@@ -188,7 +202,12 @@ class PointsYeahScraper:
                         "program": program_name, "route": route_str, "date": deal_date,
                         "departure_time": departure_time, "arrival_time": arrival_time,
                         "duration_minutes": route.get("duration", 0),
-                        "direct": len(valid_segments) == 1, "economy": None, "premium": None,
+                        "direct": len(valid_segments) == 1,
+                        "stops": stops,
+                        "airlines": airlines,
+                        "overnight_layover": overnight_layover,
+                        "layover_duration": layover_duration,
+                        "economy": None, "premium": None,
                         "business": None, "first": None,
                         "flight_numbers": flight_numbers
                     }

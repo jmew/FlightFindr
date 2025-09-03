@@ -530,7 +530,17 @@ body.empty-chat-mobile-lock {
   font-size: 12px;
   font-weight: 400;
   color: rgb(154, 160, 166);
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
+
+.overnight-warning {
+  color: #ffc107; /* A warning yellow */
+  display: inline-flex;
+  align-items: center;
+}
+
 
 .deal-row .section .time sup {
   font-size: 0.7em;
@@ -658,53 +668,88 @@ body.empty-chat-mobile-lock {
 /* Filter Styles */
 .deal-filters-container {
   display: flex;
-  gap: 24px;
+  gap: 16px;
   align-items: center;
   margin-bottom: 16px;
-  padding: 8px 12px;
-  background-color: var(--gem-sys-color--surface-container);
-  border-radius: var(--gem-sys-shape--corner-large);
+  padding: 8px 0;
+  width: 100%;
 }
 
-.filter-group {
-  margin-bottom: 0;
-}
-
-.filter-label {
-  font-weight: 500;
-  margin-bottom: 8px;
-  display: block;
-  font-size: 0.9rem;
-}
-
-.toggle-buttons {
+.filter-chips-scroll-container {
   display: flex;
   gap: 8px;
+  overflow-x: auto;
+  flex-grow: 1;
+  scrollbar-width: none; /* Firefox */
+}
+
+.filter-chips-scroll-container::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
+.filter-chip-dropdown .dropdown-toggle {
+  background-color: var(--gem-sys-color--surface-container);
+  border: 1px solid var(--gem-sys-color--surface-container);
+  color: rgb(210, 227, 252);
+  border-radius: 20px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Google Sans", Roboto, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.15px;
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.filter-chip-dropdown .dropdown-toggle.active {
+  background-color: #3c4a68;
+  border-color: var(--gem-sys-color--primary);
+  color: var(--gem-sys-color--on-surface);
+}
+
+.filter-chip-dropdown .dropdown-toggle::after {
+  display: none; /* Hide default bootstrap arrow */
+}
+
+.chip-icon {
+  font-size: 1rem;
+}
+
+.filter-chip-dropdown .dropdown-menu {
+  background-color: var(--gem-sys-color--surface-container);
+  border-color: var(--gem-sys-color--surface);
+  z-index: 1050; /* Ensure it's above other content */
+}
+
+.filter-chip-dropdown .dropdown-item-text {
+  padding: 0.5rem 1rem;
+}
+
+.filter-chip-dropdown .form-check-input:checked {
+  background-color: var(--gem-sys-color--primary);
+  border-color: var(--gem-sys-color--primary);
+}
+
+.filter-chip-dropdown .form-check-label {
+  color: var(--gem-sys-color--on-surface);
 }
 
 .sort-select {
-  background-color: var(--gem-sys-color--surface);
+  background-color: var(--gem-sys-color--surface-container);
   border: 1px solid var(--gem-sys-color--surface-container);
   color: var(--gem-sys-color--on-surface);
   padding: 8px 12px;
   border-radius: 20px;
   cursor: pointer;
+  font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
-.toggle-btn {
-  background-color: var(--gem-sys-color--surface);
-  border: 1px solid var(--gem-sys-color--surface-container);
-  color: var(--gem-sys-color--on-surface-variant);
-  padding: 8px 16px;
-  border-radius: 20px;
-  cursor: pointer;
-}
-
-.toggle-btn.active {
-  background-color: var(--gem-sys-color--primary);
-  color: var(--gem-sys-color--surface);
-  border-color: var(--gem-sys-color--primary);
-}
 
 .logo-icon {
   display: inline-flex;

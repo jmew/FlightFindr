@@ -51,12 +51,16 @@ export interface FlightDeal {
   origin_airport_info: AirportInfo;
   destination_airport_info: AirportInfo;
   source: string;
-  
+  stops?: string[];
+  airlines?: string[];
+  overnight_layover?: boolean;
+  layover_duration?: number;
+
   economy?: CabinDeal;
   premium?: CabinDeal;
   business?: CabinDeal;
   first?: CabinDeal;
-  
+
   // For frontend state management
   displayCabin: 'economy' | 'premium' | 'business' | 'first';
   isBestDeal?: boolean;

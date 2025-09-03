@@ -45,6 +45,7 @@ import {
 } from '@icons-pack/react-simple-icons';
 import { FaCreditCard, FaPlane } from 'react-icons/fa';
 import CitiLogo from './CitiLogo';
+import { getAirlineNameByCode } from '../../utils/airlineMappings';
 
 const AIRLINE_LOGO_MAP: { [key: string]: React.ReactNode } = {
   'Aer Lingus': <SiAerlingus color="default" />,
@@ -97,7 +98,9 @@ const BANK_LOGO_MAP: { [key: string]: React.ReactNode } = {
 
 const getLogo = (name: string, type: 'airline' | 'bank') => {
   const map = type === 'airline' ? AIRLINE_LOGO_MAP : BANK_LOGO_MAP;
-  const foundKey = Object.keys(map).find(key => name.toLowerCase().includes(key.toLowerCase()));
+  const resolvedName = type === 'airline' ? getAirlineNameByCode(name) : name;
+  
+  const foundKey = Object.keys(map).find(key => resolvedName.toLowerCase().includes(key.toLowerCase()));
   
   if (foundKey) {
     const logoComponent = map[foundKey];
