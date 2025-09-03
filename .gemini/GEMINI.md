@@ -27,11 +27,6 @@ To run the services locally for development:
 
 This project has specific behaviors and solutions that are critical to its operation.
 
-1.  **Scraper Login Logic is Sensitive:**
-    *   The login process on `pointsyeah.com` appears to be sensitive to some automation patterns.
-    *   In our testing, we found that using explicit waiting logic after the login click (e.g., `page.wait_for_url()` or waiting for error text) consistently failed, suggesting it might be detected by anti-bot measures.
-    *   The most reliable method we found was to use a simple, fixed `asyncio.sleep(3)` after clicking. This "dumb" wait proved more effective than active polling. While a more event-driven approach might be possible if implemented carefully, be aware of this sensitivity. Before changing the login flow, test it thoroughly to ensure it doesn't re-introduce the timeout failures.
-
 2.  **Scraper Search Completion:**
     *   To detect when a flight search is complete, the scraper now waits for a specific network response containing `{"data": {"status": "done"}}`.
     *   This is much more reliable than waiting for UI elements like progress bars. This logic is located in the `scrape()` method of `pointsyeah.py`.

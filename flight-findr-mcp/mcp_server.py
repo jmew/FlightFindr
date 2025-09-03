@@ -69,7 +69,13 @@ class FlightSearchMCP(FastMCP):
             if not normalized_program:
                 continue  # Skip deals without a program name
 
-            deal_id = (deal.get("date"), deal.get("route"), normalized_program)
+            deal_id = (
+                deal.get("date"),
+                deal.get("route"),
+                normalized_program,
+                deal.get("departure_time"),
+                deal.get("arrival_time"),
+            )
 
             if deal_id not in merged_deals:
                 deal["program"] = normalized_program
