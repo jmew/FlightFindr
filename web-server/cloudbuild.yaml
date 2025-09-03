@@ -26,6 +26,7 @@ steps:
     - '--platform=managed'
     - '--allow-unauthenticated'
     - '--port=3000'
+    - '--timeout=300s'
     - '--set-env-vars=MCP_URL=https://mcp-server-304334704110.us-central1.run.app/mcp,GEMINI_API_KEY=$_GEMINI_API_KEY'
 
 images:
