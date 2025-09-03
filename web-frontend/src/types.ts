@@ -1,5 +1,3 @@
-import type { FlightDealRow } from './components/FlightDealsTable';
-
 export interface Tool {
   callId: string;
   name: string;
@@ -12,19 +10,54 @@ export interface Message {
   sender: 'user' | 'bot';
   text: string;
   tools?: Tool[];
-  flightData?: FlightDealRow[];
+  flightData?: FlightDeal[];
 }
 
-export interface Deal {
-  [key: string]: any;
-  date: string;
+interface AirportInfo {
+  name: string;
+  city: string;
+  country: string;
+  lat: number;
+  lon: number;
+}
+
+interface CabinDeal {
+  points: number;
+  fees: string;
+  booking_url: string;
+  seats: number;
+  transfer_info: {
+    bank: string;
+    bonus_percentage: number;
+    bonus_end_date: string;
+  }[];
+  bonus: {
+    bank: string;
+    percentage: number;
+    end_date: string;
+  } | null;
+}
+
+export interface FlightDeal {
+  id: string; // A unique identifier for the deal
   program: string;
   route: string;
+  date: string;
   departure_time: string;
   arrival_time: string;
+  duration_minutes: number;
+  direct: boolean;
   flight_numbers: string[];
-  economy?: { points: number; fees: string; booking_url: string; transfer_info: any[], bonus: any };
-  business?: { points: number; fees: string; booking_url: string; transfer_info: any[], bonus: any };
-  first?: { points: number; fees: string; booking_url: string; transfer_info: any[], bonus: any };
-  premium?: { points: number; fees: string; booking_url: string; transfer_info: any[], bonus: any };
+  origin_airport_info: AirportInfo;
+  destination_airport_info: AirportInfo;
+  source: string;
+  
+  economy?: CabinDeal;
+  premium?: CabinDeal;
+  business?: CabinDeal;
+  first?: CabinDeal;
+  
+  // For frontend state management
+  displayCabin: 'economy' | 'premium' | 'business' | 'first';
+  isBestDeal?: boolean;
 }

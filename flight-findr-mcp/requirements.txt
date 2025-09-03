@@ -1,9 +1,5 @@
-playwright
-beautifulsoup4
-requests
-lxml
 fastmcp
+playwright
 uvicorn
 fast-flights
-fastapi
-primp
+airportsdata

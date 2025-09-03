@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { FlightDealRow } from '../components/FlightDealsTable';
+import type { FlightDeal } from '../types';
 import type { Message, Tool } from '../types';
 
 export function useChat() {
@@ -146,34 +146,10 @@ export function useChat() {
                   try {
                     const parsedResult = JSON.parse(data.result);
                     if (parsedResult.all_deals) {
-                      let idCounter = newFlightData.length;
-                      const parsedFlightData = parsedResult.all_deals.flatMap((deal: any) => {
-                        const rows: FlightDealRow[] = [];
-                        const cabinClasses = ['economy', 'premium', 'business', 'first'];
-
-                        cabinClasses.forEach(cabinClass => {
-                          if (deal[cabinClass]) {
-                            const cabinData = deal[cabinClass];
-                            rows.push({
-                              id: idCounter++,
-                              date: deal.date,
-                              airline: deal.program,
-                              route: deal.route,
-                              class: cabinClass.charAt(0).toUpperCase() + cabinClass.slice(1),
-                              points: cabinData.points,
-                              fees: cabinData.fees,
-                              departureTime: deal.departure_time,
-                              arrivalTime: deal.arrival_time,
-                              duration: deal.duration_minutes,
-                              flightNumbers: deal.flight_numbers.join(', '),
-                              bookingUrl: cabinData.booking_url,
-                              transferFrom: cabinData.transfer_info?.map((t: any) => t.bank).join(', ') || 'N/A',
-                              transferBonus: cabinData.bonus ? `${cabinData.bonus.percentage}% from ${cabinData.bonus.bank}` : 'None',
-                            });
-                          }
-                        });
-                        return rows;
-                      });
+                      const parsedFlightData: FlightDeal[] = parsedResult.all_deals.map((deal: any, index: number) => ({
+                        ...deal,
+                        id: `${deal.route}-${deal.departure_time}-${index}`, // Create a more stable ID
+                      }));
                       newFlightData = [...newFlightData, ...parsedFlightData];
                     }
                   } catch (e) {

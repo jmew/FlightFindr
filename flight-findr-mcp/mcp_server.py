@@ -5,10 +5,22 @@ from fastmcp import FastMCP
 from fastmcp.tools import Tool
 from scrapers import pointsyeah
 import json
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from playwright.async_api import Playwright, async_playwright
+import airportsdata
 
 from scrapers.utils import PROGRAM_MAPPING
+
+# --- Airport Data ---
+airports: Optional[Dict[str, Any]] = None
+
+def load_airport_data():
+    """Loads the airport data into memory."""
+    global airports
+    if airports is None:
+        print("Loading airport data...")
+        airports = airportsdata.load('IATA')
+        print("Airport data loaded.")
 
 def normalize_program_name(program_name: Optional[str]) -> Optional[str]:
     """Normalizes airline program names for consistent matching."""
@@ -22,11 +34,20 @@ def normalize_program_name(program_name: Optional[str]) -> Optional[str]:
 class FlightSearchMCP(FastMCP):
     def __init__(self):
         super().__init__()
-        tool = Tool.from_function(
+        self.add_tool(Tool.from_function(
             self.check_flight_points_prices,
             description="Finds the best flight deals using points and cash from various sources.",
-        )
-        self.add_tool(tool)
+        ))
+        self.add_tool(Tool.from_function(
+            self.get_airport_info,
+            description="Gets information about an airport from its IATA code.",
+        ))
+
+    def get_airport_info(self, iata_code: str) -> Dict[str, Any]:
+        """Returns airport information for a given IATA code."""
+        if not airports:
+            return {"error": "Airport data not loaded"}
+        return airports.get(iata_code, {"error": "Airport not found"})
 
     async def check_flight_points_prices(
         self,
@@ -67,7 +88,7 @@ class FlightSearchMCP(FastMCP):
         for deal in all_deals:
             normalized_program = normalize_program_name(deal.get("program"))
             if not normalized_program:
-                continue  # Skip deals without a program name
+                continue
 
             deal_id = (
                 deal.get("date"),
@@ -78,6 +99,10 @@ class FlightSearchMCP(FastMCP):
             )
 
             if deal_id not in merged_deals:
+                # Enrich with airport info
+                origin_code, dest_code = deal.get("route", " -> ").split(" -> ")
+                deal["origin_airport_info"] = self.get_airport_info(origin_code)
+                deal["destination_airport_info"] = self.get_airport_info(dest_code)
                 deal["program"] = normalized_program
                 merged_deals[deal_id] = deal
             else:
@@ -125,6 +150,7 @@ async def startup_event():
     """Initializes the playwright instance and scrapers."""
     global playwright_instance
     print("Server starting up, initializing scrapers...")
+    load_airport_data()
     playwright_instance = await async_playwright().start()
     await pointsyeah.initialize_scraper(playwright_instance)
     print("Scrapers initialized.")

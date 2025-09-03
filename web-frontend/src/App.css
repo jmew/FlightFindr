@@ -363,6 +363,48 @@ body.empty-chat-mobile-lock {
   border-color: var(--gem-sys-color--primary);
 }
 
+.deal-card-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+  color: var(--gem-sys-color--on-surface-variant);
+}
+
+.flight-date {
+  font-weight: 500;
+  color: var(--gem-sys-color--on-surface);
+  font-size: 1rem;
+}
+
+.flight-info {
+  text-align: center;
+}
+
+.flight-info .time {
+  font-weight: 500;
+  font-size: 1.1rem;
+  color: var(--gem-sys-color--on-surface);
+}
+
+.flight-info .time sup {
+  font-size: 0.7em;
+  margin-left: 2px;
+}
+
+.flight-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.flight-meta .separator {
+  color: var(--gem-sys-color--surface);
+}
+
 .deal-card-main {
   display: flex;
   align-items: center;
@@ -376,6 +418,10 @@ body.empty-chat-mobile-lock {
   gap: 8px;
   font-weight: 500;
   flex-grow: 1;
+}
+
+.deal-card-airline .logo-icon {
+  transform: scale(1.15);
 }
 
 .airline-logo-placeholder {
@@ -432,14 +478,148 @@ body.empty-chat-mobile-lock {
   background-color: #a6c9f8; /* Lighter primary */
 }
 
-.deal-card-footer {
+/* New Deal Row Styles */
+.deals-container {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--gem-sys-color--surface);
+  flex-direction: column;
+  gap: 8px; /* Tighter spacing between rows */
 }
+
+.deal-row-container {
+  background-color: var(--gem-sys-color--surface-container);
+  border-radius: var(--gem-sys-shape--corner-large);
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease-in-out;
+}
+
+.deal-row-container:hover {
+  border-color: var(--gem-sys-color--primary);
+}
+
+.deal-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1.5fr 1.5fr 0.5fr; /* 5 columns */
+  align-items: center;
+  padding: 16px;
+  cursor: pointer;
+  gap: 16px;
+}
+
+.deal-row .section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9rem;
+  color: var(--gem-sys-color--on-surface-variant);
+}
+
+.deal-row .section .time,
+.deal-row .section .duration,
+.deal-row .section .points-value {
+  font-family: "Google Sans", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: rgb(232, 234, 237);
+}
+
+.deal-row .section .route,
+.deal-row .section .airline-name,
+.deal-row .section .fees,
+.deal-row .section .stops {
+  font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgb(154, 160, 166);
+}
+
+.deal-row .section .time sup {
+  font-size: 0.7em;
+  margin-left: 2px;
+}
+
+.airline-info {
+  gap: 4px !important;
+  align-items: flex-start;
+}
+
+.airline-info .logo-icon {
+  font-size: 28px; /* Slightly larger logo */
+}
+
+.points-info {
+  align-items: flex-end;
+}
+
+.points-value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fees {
+  font-size: 0.85rem;
+}
+
+.details-toggle {
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+}
+
+.deal-row-expanded-details {
+  padding: 16px;
+  border-top: 1px solid var(--gem-sys-color--surface);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-item strong {
+  font-weight: 500;
+  color: var(--gem-sys-color--on-surface);
+}
+
+.detail-item span, .detail-item a {
+  color: var(--gem-sys-color--on-surface-variant);
+}
+
+.transfer-bonus-details {
+  color: #ffc107;
+}
+
+.transfers {
+  gap: 8px !important;
+}
+
+.transfer-partners {
+  display: flex;
+  gap: 8px;
+}
+
+.deal-card-book-btn {
+  background-color: var(--gem-sys-color--primary);
+  color: var(--gem-sys-color--surface);
+  padding: 10px 16px;
+  border-radius: 20px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  text-align: center;
+  margin-top: 8px;
+  grid-column: 1 / -1; /* Span full width */
+}
+
+.deal-card-book-btn:hover {
+  background-color: #a6c9f8; /* Lighter primary */
+}
+
+/* Filter Styles */
 
 .details-toggle-btn {
   background: none;

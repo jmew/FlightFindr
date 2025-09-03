@@ -1,182 +1,154 @@
 import React, { useMemo, useState } from 'react';
 import { FiStar, FiChevronDown, FiChevronUp } from 'react-icons/fi';
-import { MdAirlineSeatReclineNormal } from 'react-icons/md';
 import DealFilters from '../DealFilters';
 import Logo from '../Logo';
+import type { FlightDeal } from '../../types';
+import { formatDuration, formatFlightTimes } from '../../utils/formatters';
 
-export interface FlightDealRow {
-  id: number;
-  date: string;
-  airline: string;
-  route: string;
-  class: string;
-  points: number;
-  fees: string;
-  departureTime: string;
-  arrivalTime: string;
-  flightNumbers: string;
-  bookingUrl: string;
-  transferFrom: string;
-  transferBonus: string;
-  duration: number;
-  isBestDeal?: boolean;
+interface DealRowProps {
+  deal: FlightDeal;
+  cabin: 'economy' | 'premium' | 'business' | 'first';
 }
 
-interface DealCardProps {
-  deal: FlightDealRow;
-}
-
-const DealCard = ({ deal }: DealCardProps) => {
+const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const transferPartners = deal.transferFrom ? deal.transferFrom.split(',').map(p => p.trim()) : [];
+  const cabinData = deal[cabin];
 
-  const getDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${hours}h ${mins}m`;
-  };
+  if (!cabinData) return null;
 
-  const stops = deal.flightNumbers ? deal.flightNumbers.split(',').length - 1 : 0;
+  const { points, fees, booking_url, transfer_info, bonus } = cabinData;
+  const transferPartners = transfer_info?.map((t: { bank: string }) => t.bank) || [];
+  const [origin, destination] = deal.route.split(' -> ');
+  const { departureTime, arrivalTime, isNextDay } = formatFlightTimes(deal.departure_time, deal.arrival_time);
 
   return (
-    <div className={`deal-card ${deal.isBestDeal ? 'best-deal' : ''}`}>
-      {deal.isBestDeal && <div className="best-deal-badge">Best {deal.class} Deal</div>}
-      <div className="deal-card-main">
-        <div className="deal-card-airline">
-          <Logo type="airline" name={deal.airline} />
-          <span>{deal.airline}</span>
+    <div className="deal-row-container">
+      <div className="deal-row" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="section airline-info">
+          <Logo type="airline" name={deal.program} />
+          <span className="airline-name">{deal.program}</span>
         </div>
-        <div className="deal-card-points">
-          <span className="points-value">{deal.points.toLocaleString()}</span>
-          <span className="points-label">pts</span>
-          {deal.transferBonus && deal.transferBonus !== 'None' && (
-            <span title={`Transfer Bonus: ${deal.transferBonus}`} className="transfer-bonus-star">
-              <FiStar />
-            </span>
-          )}
+        <div className="section time-info">
+          <span className="time">
+            {departureTime} → {arrivalTime}
+            {isNextDay && <sup>+1</sup>}
+          </span>
+          <div className="route">{deal.route}</div>
         </div>
-        <div className="deal-card-fees">
-          + {deal.fees}
+        <div className="section duration-info">
+          <div className="duration">{formatDuration(deal.duration_minutes)}</div>
+          <div className="stops">{deal.direct ? 'Nonstop' : `${deal.flight_numbers.length - 1} Stop(s)`}</div>
         </div>
-      </div>
-      <div className="deal-card-details">
-        <div className="deal-card-cabin">
-          <MdAirlineSeatReclineNormal />
-          <span>{deal.class}</span>
+        <div className="section points-info">
+          <div className="points-value">
+            {points.toLocaleString()} pts
+            {bonus && (
+              <span title={`Transfer Bonus: ${bonus.percentage}% from ${bonus.bank}`} className="transfer-bonus-star">
+                <FiStar />
+              </span>
+            )}
+          </div>
+          <div className="fees">+ {fees}</div>
         </div>
-        <div className="deal-card-route">{deal.route}</div>
-        <a href={deal.bookingUrl} target="_blank" rel="noopener noreferrer" className="deal-card-book-btn">
-          Book on {deal.airline}
-        </a>
-      </div>
-      
-      <div className="deal-card-footer">
-        <div className="deal-card-transfers">
-          {transferPartners.length > 0 && (
-            <>
-              <span className="transfer-label">Transfer from:</span>
-              <div className="transfer-partners">
-                {transferPartners.map(partner => (
-                  <Logo key={partner} type="bank" name={partner} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        <button className="details-toggle-btn" onClick={() => setIsExpanded(!isExpanded)}>
-          <span>{isExpanded ? 'Hide' : 'Details'}</span>
+        <div className="section details-toggle">
           {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
-        </button>
+        </div>
       </div>
-
       {isExpanded && (
-        <div className="deal-card-expanded-details">
+        <div className="deal-row-expanded-details">
           <div className="detail-item">
-            <strong>Flight Numbers:</strong> {deal.flightNumbers || 'N/A'}
+            <strong>{origin}:</strong>
+            <span>{deal.origin_airport_info.name}</span>
           </div>
           <div className="detail-item">
-            <strong>Departure:</strong> {new Date(deal.departureTime).toLocaleString()}
+            <strong>{destination}:</strong>
+            <span>{deal.destination_airport_info.name}</span>
           </div>
           <div className="detail-item">
-            <strong>Arrival:</strong> {new Date(deal.arrivalTime).toLocaleString()}
+            <strong>Flight Numbers:</strong> {deal.flight_numbers.join(', ')}
           </div>
-          <div className="detail-item">
-            <strong>Duration:</strong> {getDuration(deal.duration)}
-          </div>
-          <div className="detail-item">
-            <strong>Stops:</strong> {stops > 0 ? `${stops} stop(s)` : 'Nonstop'}
-          </div>
-          {deal.transferBonus && deal.transferBonus !== 'None' && (
+          {bonus && (
             <div className="detail-item transfer-bonus-details">
-              <strong>✨ Transfer Bonus:</strong> {deal.transferBonus}
+              <strong>✨ {bonus.percentage}% Transfer Bonus</strong> from {bonus.bank} (ends {bonus.end_date})
             </div>
           )}
+          <div className="detail-item transfers">
+            <strong>Transfer From:</strong>
+            <div className="transfer-partners">
+              {transferPartners.map((partner: string) => (
+                <Logo key={partner} type="bank" name={partner} />
+              ))}
+            </div>
+          </div>
+          <a href={booking_url} target="_blank" rel="noopener noreferrer" className="deal-card-book-btn">
+            Book on {deal.program}
+          </a>
         </div>
       )}
     </div>
   );
 };
 
-interface FlightDealsProps {
-  deals: FlightDealRow[];
+interface FlightDealsTableProps {
+  deals: FlightDeal[];
 }
 
-const FlightDeals = ({ deals }: FlightDealsProps) => {
-  const [filters, setFilters] = useState<{ cabinClasses: string[] }>({ cabinClasses: ['Economy'] });
+const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
+  const [filters, setFilters] = useState<{ cabinClasses: string[] }>({ cabinClasses: ['economy'] });
   const [sortBy, setSortBy] = useState('points');
 
+  const dealsWithCabin = useMemo(() => {
+    const cabinPriority: ('economy' | 'premium' | 'business' | 'first')[] = ['economy', 'premium', 'business', 'first'];
+    
+    return deals.map(deal => {
+      for (const cabin of cabinPriority) {
+        if (deal[cabin]) {
+          return { ...deal, displayCabin: cabin };
+        }
+      }
+      return { ...deal, displayCabin: 'economy' }; // Fallback
+    });
+  }, [deals]);
+
   const filteredDeals = useMemo(() => {
-    return deals.filter(deal => {
+    return dealsWithCabin.filter(deal => {
       const { cabinClasses } = filters;
-      if (cabinClasses.length > 0 && !cabinClasses.includes(deal.class)) {
+      if (cabinClasses.length > 0 && !cabinClasses.includes(deal.displayCabin)) {
         return false;
       }
       return true;
     });
-  }, [deals, filters]);
-
-  const dealsWithBestBadge = useMemo(() => {
-    const bestDeals: { [key: string]: FlightDealRow } = {};
-    filteredDeals.forEach(deal => {
-      const currentBest = bestDeals[deal.class];
-      if (!currentBest || deal.points < currentBest.points) {
-        bestDeals[deal.class] = deal;
-      }
-    });
-    return filteredDeals.map(deal => ({
-      ...deal,
-      isBestDeal: !!bestDeals[deal.class] && bestDeals[deal.class].id === deal.id,
-    }));
-  }, [filteredDeals]);
+  }, [dealsWithCabin, filters]);
 
   const sortedDeals = useMemo(() => {
-    return [...dealsWithBestBadge].sort((a, b) => {
+    return [...filteredDeals].sort((a, b) => {
+      const aCabin = a.displayCabin as 'economy' | 'premium' | 'business' | 'first';
+      const bCabin = b.displayCabin as 'economy' | 'premium' | 'business' | 'first';
+      
       if (sortBy === 'points') {
-        if (a.isBestDeal && !b.isBestDeal) return -1;
-        if (!a.isBestDeal && b.isBestDeal) return 1;
-        return a.points - b.points;
+        const aData = a[aCabin];
+        const bData = b[bCabin];
+        return (aData?.points || Infinity) - (bData?.points || Infinity);
       }
+      
       if (sortBy === 'fees') {
-        const feeA = parseFloat(a.fees.replace(/[^\d.]/g, ''));
-        const feeB = parseFloat(b.fees.replace(/[^\d.]/g, ''));
+        const aData = a[aCabin];
+        const bData = b[bCabin];
+        const feeA = aData ? parseFloat(aData.fees.replace(/[^\d.]/g, '')) : Infinity;
+        const feeB = bData ? parseFloat(bData.fees.replace(/[^\d.]/g, '')) : Infinity;
         return feeA - feeB;
       }
       return 0;
     });
-  }, [dealsWithBestBadge, sortBy]);
-
-  const lastBestDealIndex = sortedDeals.findLastIndex((d: FlightDealRow) => d.isBestDeal);
+  }, [filteredDeals, sortBy]);
 
   return (
     <>
       <DealFilters filters={filters} setFilters={setFilters} sortBy={sortBy} setSortBy={setSortBy} />
       <div className="deals-container">
-        {sortedDeals.map((deal, index) => (
+        {sortedDeals.map((deal) => (
           <React.Fragment key={deal.id}>
-            <DealCard deal={deal} />
-            {deal.isBestDeal && index === lastBestDealIndex && (
-              <div className="deal-separator" />
-            )}
+            <DealRow deal={deal} cabin={deal.displayCabin as 'economy' | 'premium' | 'business' | 'first'} />
           </React.Fragment>
         ))}
       </div>
@@ -184,4 +156,4 @@ const FlightDeals = ({ deals }: FlightDealsProps) => {
   );
 };
 
-export default FlightDeals;
+export default FlightDealsTable;
