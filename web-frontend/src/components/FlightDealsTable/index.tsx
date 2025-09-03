@@ -148,7 +148,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
       <div className="deals-container">
         {sortedDeals.map((deal) => (
           <React.Fragment key={deal.id}>
-            <DealRow deal={deal} cabin={deal.displayCabin as 'economy' | 'premium' | 'business' | 'first'} />
+            <DealRow deal={deal as FlightDeal} cabin={deal.displayCabin as 'economy' | 'premium' | 'business' | 'first'} />
           </React.Fragment>
         ))}
       </div>
