@@ -246,11 +246,11 @@ async def main_test():
         deals = await scrape_pointsyeah("SEA", "GEG", "2025-10-04", "2025-10-04")
         if deals:
             print(f"Found {len(deals)} deals.")
-            output_filename = "deals.json"
+            # output_filename = "deals.json"
 
-            # Write the deals to the JSON file
-            with open(output_filename, 'w') as f:
-                json.dump(deals, f, indent=2)
+            # # Write the deals to the JSON file
+            # with open(output_filename, 'w') as f:
+            #     json.dump(deals, f, indent=2)
 
     finally:
         await close_scraper()
