@@ -32,7 +32,7 @@ const MessageList: React.FC<MessageListProps> = ({
         </svg>
         {thought && (
           <span className="thought">
-            {thought} ({elapsedTime}s, This may take up to 2 minutes...)
+            {thought} ({elapsedTime}s, This may take up to 1 minute)
           </span>
         )}
       </div>

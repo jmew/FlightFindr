@@ -3,7 +3,11 @@ import json
 import asyncio
 import os
 from typing import List, Dict, Any, Optional
+from scrapers.utils import parse_time, get_flight_cash_prices
 from datetime import datetime
+from fast_flights import get_flights, FlightData, Passengers
+
+
 
 class PointsYeahScraper:
     """
@@ -33,16 +37,20 @@ class PointsYeahScraper:
             ]
         )
         self.page = await self._create_new_page()
-        await self._login()
 
     async def _create_new_page(self) -> Page:
         """Creates a new page with anti-bot detection scripts and resource blocking."""
+        # Determine the absolute path to the auth_state.json file
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        auth_file_path = os.path.join(script_dir, "auth_state.json")
+
         context = await self.browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
             viewport={'width': 1920, 'height': 1080},
             locale='en-US',
             timezone_id='America/New_York',
-            color_scheme='light'
+            color_scheme='light',
+            storage_state=auth_file_path
         )
         page = await context.new_page()
 
@@ -70,51 +78,6 @@ class PointsYeahScraper:
         '''
         await page.add_init_script(stealth_script)
         return page
-
-    async def _login(self):
-        """Performs a one-time login to PointsYeah."""
-        if not self.page: return
-        try:
-            print("Navigating to login page...")
-            await self.page.goto("https://www.pointsyeah.com/login", timeout=120000, wait_until="domcontentloaded")
-
-            print("Waiting for login modal...")
-            login_modal = self.page.locator('div[role="dialog"]')
-            await login_modal.wait_for(state="visible", timeout=30000)
-            
-            print("Entering credentials...")
-            await login_modal.locator('input[name="username"]').fill("jepara2048@mogash.com", timeout=10000)
-            await login_modal.locator('input[name="password"]').fill("Password1!", timeout=10000)
-        
-        except Exception as e:
-            print(f"An error occurred during initial page load and form fill: {e}")
-            try:
-                page_content = await self.page.content()
-                print("\n--- Page Content on Timeout ---")
-                print(page_content)
-                print("--- End Page Content---\n")
-            except Exception as content_error:
-                print(f"Could not retrieve page content: {content_error}")
-            await self.close()
-            raise
-
-        max_retries = 3
-        for attempt in range(max_retries):
-            print(f"Clicking 'Sign In' (Attempt {attempt + 1}/{max_retries})...")
-            await self.page.locator('button[type="submit"].amplify-button--primary').click()
-            await asyncio.sleep(1)
-
-            error_element = await self.page.query_selector("text=Incorrect username or password")
-            if error_element and await error_element.is_visible():
-                print("Login failed with 'Incorrect username or password'. Retrying click...")
-                if attempt == max_retries - 1:
-                    raise Exception("Login failed after multiple retries: Incorrect username or password.")
-                continue
-            
-            print("Login successful.")
-            return
-        
-        raise Exception("Login failed after multiple retries.")
 
     async def scrape(self, origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Scrapes pointsyeah.com for flight deals."""
@@ -155,7 +118,17 @@ class PointsYeahScraper:
         finally:
             self.page.remove_listener("response", handle_response)
         
-        return self._process_deals(all_deals)
+        processed_deals = self._process_deals(all_deals)
+
+        # Enrich deals with cash prices and CPP
+        cash_price_tasks = []
+        for deal in processed_deals:
+            for cabin in ['economy', 'premium', 'business', 'first']:
+                cash_price_tasks.append(get_flight_cash_prices(deal, cabin))
+        
+        await asyncio.gather(*cash_price_tasks)
+
+        return processed_deals
 
     def _build_search_url(self, origin: str, destination: str, start_date: str, end_date: str) -> str:
         multiday = "true" if start_date != end_date else "false"
@@ -276,10 +249,14 @@ async def main_test():
     try:
         await initialize_scraper(playwright)
         
-        deals = await scrape_pointsyeah("SEA", "JFK", "2025-10-04", "2025-10-04")
+        deals = await scrape_pointsyeah("SEA", "GEG", "2025-10-04", "2025-10-04")
         if deals:
             print(f"Found {len(deals)} deals.")
-            print(json.dumps(deals, indent=2))
+            output_filename = "deals.json"
+
+            # Write the deals to the JSON file
+            with open(output_filename, 'w') as f:
+                json.dump(deals, f, indent=2)
 
     finally:
         await close_scraper()

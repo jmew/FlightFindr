@@ -6,8 +6,18 @@ from fastmcp.tools import Tool
 from scrapers import pointsyeah
 import json
 from typing import List, Optional
-from cash_price import get_flight_cash_prices, normalize_program_name
 from playwright.async_api import Playwright, async_playwright
+
+from scrapers.utils import PROGRAM_MAPPING
+
+def normalize_program_name(program_name: Optional[str]) -> Optional[str]:
+    """Normalizes airline program names for consistent matching."""
+    if not program_name:
+        return None
+    
+    lower_program_name = program_name.strip().lower()
+    
+    return PROGRAM_MAPPING.get(lower_program_name, program_name.title())
 
 class FlightSearchMCP(FastMCP):
     def __init__(self):
@@ -82,14 +92,6 @@ class FlightSearchMCP(FastMCP):
                             existing_deal["source"] = "multiple"
         
         unique_deals = list(merged_deals.values())
-
-        # Enrich deals with cash prices and CPP
-        cash_price_tasks = []
-        for deal in unique_deals:
-            for cabin in ['economy', 'premium', 'business', 'first']:
-                cash_price_tasks.append(get_flight_cash_prices(deal, cabin))
-        
-        await asyncio.gather(*cash_price_tasks)
 
         def get_best_points(deal):
             for cabin in ['economy', 'premium', 'business', 'first']:
