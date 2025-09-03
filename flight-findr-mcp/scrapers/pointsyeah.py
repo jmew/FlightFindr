@@ -180,7 +180,7 @@ class PointsYeahScraper:
                             overnight_layover = True
                         layover_duration += (departure_time - arrival_time).total_seconds() / 60
 
-                flight_numbers = [s.get("flight_number") for s in valid_segments]
+                flight_numbers = [s.get("flight_number") for s in valid_segments if s.get("flight_number")]
                 departure_time, arrival_time = valid_segments[0].get("dt"), valid_segments[-1].get("at")
                 deal_key = (program_name, deal_date, route_str, departure_time, arrival_time)
 

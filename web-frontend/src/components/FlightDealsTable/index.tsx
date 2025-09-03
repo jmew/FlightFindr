@@ -31,12 +31,12 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
     deal.arrival_time,
   );
 
-  const airlineName = deal.airlines.length === 1 ? getAirlineNameByCode(deal.airlines[0]) : 'Mixed';
+  const airlineName = deal.airlines && deal.airlines.length === 1 ? getAirlineNameByCode(deal.airlines[0]) : 'Mixed';
 
   const routeString =
-    deal.stops.length === 0
+    deal.stops && deal.stops.length === 0
       ? `${origin} → ${destination}`
-      : `${origin} → ${deal.stops.join(' → ')} → ${destination}`;
+      : `${origin} → ${deal.stops && deal.stops.join(' → ')} → ${destination}`;
 
   return (
     <div className="deal-row-container">
@@ -109,7 +109,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
             <div className="detail-item transfer-bonus-details">
               <strong>✨ {bonus.percentage}% Transfer Bonus</strong> from{' '}
               {bonus.bank} (ends{' '}
-              {new Date(bonus.end_date * 1000).toLocaleDateString('en-US', {
+              {new Date(Number(bonus.end_date) * 1000).toLocaleDateString('en-US', {
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric',

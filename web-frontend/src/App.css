@@ -681,6 +681,7 @@ body.empty-chat-mobile-lock {
   overflow-x: auto;
   flex-grow: 1;
   scrollbar-width: none; /* Firefox */
+  flex-wrap: wrap;
 }
 
 .filter-chips-scroll-container::-webkit-scrollbar {

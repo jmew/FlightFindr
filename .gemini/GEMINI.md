@@ -51,4 +51,4 @@ This project has specific behaviors and solutions that are critical to its opera
 
 ### Committing Changes
 
-After any change is confirmed to be working correctly (especially after a successful local test or build), stage all the changes with git to save the progress. This creates a stable checkpoint and is a critical best practice.
+After any change is confirmed to be working correctly (especially after a successful local test or build), stage all the changes with git to save the progress. Only stage it, do NOT commit it. This creates a stable checkpoint and is a critical best practice.
