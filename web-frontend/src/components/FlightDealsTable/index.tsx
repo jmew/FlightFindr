@@ -42,7 +42,15 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
     <div className="deal-row-container">
       <div className="deal-row" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="section airline-info">
-          <Logo type="airline" name={airlineName} />
+          <Logo
+            type="airline"
+            code={
+              deal.airlines && deal.airlines.length === 1
+                ? deal.airlines[0]
+                : undefined
+            }
+            name={airlineName}
+          />
           <span className="airline-name">{airlineName}</span>
         </div>
         <div className="section time-info">

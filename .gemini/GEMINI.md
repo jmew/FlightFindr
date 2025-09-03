@@ -47,7 +47,7 @@ This project has specific behaviors and solutions that are critical to its opera
     ```bash
     flight-findr-mcp/venv/bin/python flight-findr-mcp/scrapers/pointsyeah.py
     ```
-2.  **Frontend/Backend:** After making changes to `web-frontend` or `web-server`, you **must** run `npm run build` within the respective directory to ensure there are no build or type errors.
+2.  **Frontend/Backend:** After making changes to `web-frontend` or `web-server`, you **must** run `cd web-frontend (or web-server) && npm run build` within the respective directory to ensure there are no build or type errors.
 
 ### Committing Changes
 
