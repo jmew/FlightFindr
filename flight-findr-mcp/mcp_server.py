@@ -180,7 +180,7 @@ async def main_async(args):
     await startup_event()
     
     app = mcp_server.http_app()
-    config = uvicorn.Config(app, host="0.0.0.0", port=9999, log_level="info")
+    config = uvicorn.Config(app, host="0.0.0.0", port=9999, log_level="info", timeout_keep_alive=300)
     server = uvicorn.Server(config)
     
     try:

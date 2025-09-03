@@ -114,13 +114,13 @@ class PointsYeahScraper:
         
         processed_deals = self._process_deals(all_deals)
 
-        # Enrich deals with cash prices and CPP
-        cash_price_tasks = []
-        for deal in processed_deals:
-            for cabin in ['economy', 'premium', 'business', 'first']:
-                cash_price_tasks.append(get_flight_cash_prices(deal, cabin))
+        # Commenting this out for now becvause its slow
+        # cash_price_tasks = []
+        # for deal in processed_deals:
+        #     for cabin in ['economy', 'premium', 'business', 'first']:
+        #         cash_price_tasks.append(get_flight_cash_prices(deal, cabin))
         
-        await asyncio.gather(*cash_price_tasks)
+        # await asyncio.gather(*cash_price_tasks)
 
         return processed_deals
 
