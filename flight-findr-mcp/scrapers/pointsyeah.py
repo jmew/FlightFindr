@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from playwright.async_api import async_playwright, Page, Browser, Playwright, TimeoutError
 import json
 import asyncio
@@ -25,6 +29,8 @@ class PointsYeahScraper:
         self.browser = await self.playwright.chromium.launch(
             headless=self.headless,
             args=[
+                "--no-sandbox",
+                "--disable-gpu",
                 "--disable-background-timer-throttling",
                 "--disable-backgrounding-occluded-windows",
                 "--disable-renderer-backgrounding",
@@ -78,7 +84,7 @@ class PointsYeahScraper:
         if not self.page:
             raise Exception("Scraper not initialized properly.")
 
-        all_deals = []
+        best_deals: Dict[Any, Any] = {}
         loop = asyncio.get_running_loop()
         search_done_future = loop.create_future()
 
@@ -93,7 +99,7 @@ class PointsYeahScraper:
 
                     results = data.get("data", {}).get("result")
                     if data.get("success") and results:
-                        all_deals.extend(results)
+                        self._process_deals(results, best_deals)
                 except Exception as e:
                     if not search_done_future.done():
                         search_done_future.set_exception(e)
@@ -112,7 +118,7 @@ class PointsYeahScraper:
         finally:
             self.page.remove_listener("response", handle_response)
         
-        processed_deals = self._process_deals(all_deals)
+        processed_deals = list(best_deals.values())
 
         # Commenting this out for now becvause its slow
         # cash_price_tasks = []
@@ -142,9 +148,8 @@ class PointsYeahScraper:
             f"&multiday={multiday}"
         )
 
-    def _process_deals(self, all_deals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        best_deals = {}
-        for deal in all_deals:
+    def _process_deals(self, deals_chunk: List[Dict[str, Any]], best_deals: Dict[Any, Any]):
+        for deal in deals_chunk:
             if not deal.get("routes"): continue
             program_name, deal_date = deal.get("program"), deal.get("date")
             route_str = f"{deal.get('departure')} -> {deal.get('arrival')}"
@@ -200,7 +205,6 @@ class PointsYeahScraper:
                         "transfer_info": transfer_info,
                         "bonus": bonus_info
                     }
-        return list(best_deals.values())
 
     async def close(self):
         """Closes the browser."""
@@ -255,7 +259,6 @@ async def main_test():
     finally:
         await close_scraper()
         await playwright.stop()
-
 
 
 if __name__ == '__main__':
