@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   FiStar,
   FiChevronDown,
@@ -209,6 +209,27 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
     maxPoints: null,
   });
   const [sortBy, setSortBy] = useState('top');
+  const [isStuck, setIsStuck] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsStuck(entry.intersectionRatio < 1);
+      },
+      { threshold: [1] },
+    );
+
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+
+    return () => {
+      if (sentinelRef.current) {
+        observer.unobserve(sentinelRef.current);
+      }
+    };
+  }, []);
 
   const { availablePrograms, minPoints, maxPoints, shortestDuration } = useMemo(() => {
     const programs = new Set<string>();
@@ -353,6 +374,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
 
   return (
     <>
+      <div ref={sentinelRef} style={{ height: 1, width: '100%' }} />
       <DealFilters
         filters={filters}
         setFilters={setFilters}
@@ -361,6 +383,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
         availablePrograms={availablePrograms}
         minPoints={minPoints}
         maxPoints={maxPoints}
+        className={isStuck ? 'is-stuck' : ''}
       />
       <div className="deals-container">
         {sortedDeals.map((deal) => (

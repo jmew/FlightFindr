@@ -120,6 +120,7 @@ interface DealFiltersProps {
   availablePrograms: string[];
   minPoints: number;
   maxPoints: number;
+  className?: string;
 }
 
 const DealFilters: React.FC<DealFiltersProps> = ({
@@ -130,6 +131,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
   availablePrograms,
   minPoints,
   maxPoints,
+  className,
 }) => {
   const [currentMax, setCurrentMax] = useState(filters.maxPoints || maxPoints);
   const isPriceActive = filters.maxPoints !== null;
@@ -227,7 +229,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
   const inactiveFilters = filtersConfig.filter(f => !f.isActive);
 
   return (
-    <div className="deal-filters-container">
+    <div className={`deal-filters-container ${className || ''}`}>
       <div className="filter-chips-scroll-container">
         {inactiveFilters.map(filter => (
           <FilterChip key={filter.id} {...filter} />

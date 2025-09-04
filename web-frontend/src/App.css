@@ -130,14 +130,41 @@ body.empty-chat-mobile-lock {
 
 /* Mobile-specific adjustments */
 @media (max-width: 768px) {
+  .main-content {
+    padding: 0 8px; /* Reduced horizontal padding */
+  }
   .chat-conversation {
-    padding: 16px;
+    padding: 16px 0;
     padding-top: 20px;
   }
   .input-area {
     padding: 16px;
     padding-bottom: 20px;
     background-color: var(--gem-sys-color--surface);
+  }
+
+  /* Smaller text in deals table */
+  .deal-row .section .time,
+  .deal-row .section .duration,
+  .deal-row .section .points-value {
+    font-size: 14px; /* Smaller font size for key info */
+  }
+
+  .deal-row .section .route,
+  .deal-row .section .airline-name,
+  .deal-row .section .fees,
+  .deal-row .section .stops {
+    font-size: 11px; /* Smaller font size for secondary info */
+  }
+
+  .deal-row {
+    grid-template-columns: 1fr 1.8fr 1.2fr 1.2fr 0.5fr; /* Adjust column proportions */
+    gap: 8px; /* Tighter gap */
+    padding: 12px 8px; /* Tighter padding */
+  }
+
+  .flight-deals-container {
+    padding: 0;
   }
 }
 
@@ -672,13 +699,26 @@ body.empty-chat-mobile-lock {
   margin-bottom: 16px;
   padding: 8px 0;
   width: 100%;
+  /* Sticky positioning */
+  position: sticky;
+  top: 0;
+  background-color: var(--gem-sys-color--surface);
+  z-index: 100;
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+.deal-filters-container.is-stuck {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
 .filter-chips-scroll-container {
   display: flex;
   gap: 8px;
   flex-grow: 1;
+  overflow-x: auto; /* Enable horizontal scrolling */
   scrollbar-width: none; /* Firefox */
+  -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,1) 95%, rgba(0,0,0,0) 100%);
+  mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,1) 95%, rgba(0,0,0,0) 100%);
 }
 
 .filter-chips-scroll-container::-webkit-scrollbar {

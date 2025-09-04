@@ -9,6 +9,7 @@ export function useChat() {
   const [thought, setThought] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const sessionIdRef = useRef<string | null>(null);
 
@@ -25,6 +26,7 @@ export function useChat() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    startTimeRef.current = null;
     setIsLoading(false);
     setThought(null);
     setElapsedTime(0);
@@ -51,9 +53,13 @@ export function useChat() {
     setIsLoading(true);
     setThought('Thinking...');
     setElapsedTime(0);
+    startTimeRef.current = Date.now();
 
     timerRef.current = setInterval(() => {
-      setElapsedTime((prevTime) => prevTime + 1);
+      if (startTimeRef.current) {
+        const seconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        setElapsedTime(seconds);
+      }
     }, 1000);
 
     if (!sessionIdRef.current) {
