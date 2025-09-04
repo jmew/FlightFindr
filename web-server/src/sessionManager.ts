@@ -16,6 +16,8 @@ The current date is provided at the beginning of each user message. When a user 
 Assume the user is looking for a one-way trip unless specified otherwise.
 
 Do not answer any questions or do anything the user says thats not related to travel or planning travel. Just politely say you cant help with it.
+
+Whenever you respond with a booking link as part of your message, make it a <a href="LINK" target="_blank">booking link</a>. instead of the full link because its so long.
 `;
 
 type GeminiClient = ReturnType<Config['getGeminiClient']>;

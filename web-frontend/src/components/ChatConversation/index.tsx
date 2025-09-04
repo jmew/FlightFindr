@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { FiSend, FiSquare } from 'react-icons/fi';
 import type { Message } from '../../types';
 import MessageList from '../MessageList';
@@ -40,7 +40,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   handleSuggestionClick,
   handleStop,
 }) => {
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const lastMessageRef = useRef<HTMLDivElement | null>(null);
   const isChatEmpty = messages.length === 0;
   const [placeholder, setPlaceholder] = useState('');
   const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -82,30 +82,27 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
     }
   }, [isChatEmpty, suggestionIndex]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    if (!isChatEmpty) {
-      scrollToBottom();
+  useLayoutEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.sender === 'user') {
+      lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, thought, isChatEmpty]);
+  }, [messages.length]);
 
   return (
     <div className={`main-content ${isChatEmpty ? 'empty-chat' : ''}`}>
       {isChatEmpty ? (
         <WelcomeScreen />
       ) : (
-        <>
+        <div className="chat-conversation">
           <MessageList
             messages={messages}
             isLoading={isLoading}
             thought={thought}
             elapsedTime={elapsedTime}
+            lastMessageRef={lastMessageRef}
           />
-          <div ref={messagesEndRef} />
-        </>
+        </div>
       )}
       <div className="input-area">
         <form className="input-form" onSubmit={handleFormSubmit}>
@@ -119,7 +116,6 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
             }
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={isLoading}
           />
           {isLoading ? (
             <button

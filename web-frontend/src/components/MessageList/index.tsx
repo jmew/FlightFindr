@@ -6,6 +6,7 @@ interface MessageListProps {
   isLoading: boolean;
   thought: string | null;
   elapsedTime: number;
+  lastMessageRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -13,10 +14,15 @@ const MessageList: React.FC<MessageListProps> = ({
   isLoading,
   thought,
   elapsedTime,
+  lastMessageRef,
 }) => (
   <div className="chat-conversation">
     {messages.map((msg, index) => (
-      <MessageBubble key={index} msg={msg} />
+      <MessageBubble
+        key={index}
+        msg={msg}
+        ref={index === messages.length - 1 ? lastMessageRef : null}
+      />
     ))}
     {isLoading && (
       <div className="thought-display">

@@ -29,9 +29,6 @@ const FilterChip: React.FC<FilterChipProps> = ({
   children,
   isActive,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
   const handleSelect = (option: string) => {
     if (isMultiSelect) {
       const newSelection = selectedOptions.includes(option)
@@ -40,14 +37,12 @@ const FilterChip: React.FC<FilterChipProps> = ({
       onChange(newSelection);
     } else {
       onChange([option]);
-      setIsOpen(false);
     }
   };
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onClear();
-    setIsOpen(false);
   };
 
   const getButtonLabel = () => {
@@ -60,34 +55,18 @@ const FilterChip: React.FC<FilterChipProps> = ({
     return `${selectedOptions.length} selected`;
   };
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-
   return (
-    <div ref={dropdownRef} className={`filter-chip-dropdown dropdown ${isOpen ? 'show' : ''}`}>
-      <button
-        className={`filter-chip dropdown-toggle ${isActive ? 'active' : ''}`}
-        onClick={() => setIsOpen(!isOpen)}
-      >
+    <Dropdown className="filter-chip-dropdown">
+      <Dropdown.Toggle className={`filter-chip ${isActive ? 'active' : ''}`}>
         {getButtonLabel()}
         {isActive ? (
           <FiX className="chip-icon" onClick={handleClear} />
         ) : (
           <FiChevronDown className="chip-icon" />
         )}
-      </button>
+      </Dropdown.Toggle>
 
-      <div className={`dropdown-menu ${isOpen ? 'show' : ''}`}>
+      <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
         {options &&
           options.map((option) => (
             <Dropdown.ItemText key={option} onClick={(e) => e.stopPropagation()}>
@@ -102,8 +81,8 @@ const FilterChip: React.FC<FilterChipProps> = ({
             </Dropdown.ItemText>
           ))}
         {children && <div className="p-3"  onClick={(e) => e.stopPropagation()}>{children}</div>}
-      </div>
-    </div>
+      </Dropdown.Menu>
+    </Dropdown>
   );
 };
 
@@ -135,6 +114,32 @@ const DealFilters: React.FC<DealFiltersProps> = ({
 }) => {
   const [currentMax, setCurrentMax] = useState(filters.maxPoints || maxPoints);
   const isPriceActive = filters.maxPoints !== null;
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isScrollable, setIsScrollable] = useState(false);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const checkScrollable = () => {
+      const hasOverflow = container.scrollWidth > container.clientWidth;
+      setIsScrollable(hasOverflow);
+    };
+
+    checkScrollable(); // Initial check
+
+    const resizeObserver = new ResizeObserver(checkScrollable);
+    resizeObserver.observe(container);
+
+    // Also observe children for changes
+    Array.from(container.children).forEach(child => {
+      resizeObserver.observe(child);
+    });
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [filters, availablePrograms]); // Re-check when filters or programs change
 
 
   const handleFilterChange = (filterName: string, value: any) => {
@@ -230,7 +235,10 @@ const DealFilters: React.FC<DealFiltersProps> = ({
 
   return (
     <div className={`deal-filters-container ${className || ''}`}>
-      <div className="filter-chips-scroll-container">
+      <div
+        ref={scrollContainerRef}
+        className={`filter-chips-scroll-container ${isScrollable ? 'is-scrollable' : ''}`}
+      >
         {inactiveFilters.map(filter => (
           <FilterChip key={filter.id} {...filter} />
         ))}

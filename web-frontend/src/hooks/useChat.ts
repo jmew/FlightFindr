@@ -45,7 +45,7 @@ export function useChat() {
   }, [isLoading]);
 
   const handleSendMessage = (message: string) => {
-    if (!message.trim()) return;
+    if (!message.trim() || isLoading) return;
 
     const userMessage: Message = { sender: 'user', text: message };
     setMessages((prevMessages) => [...prevMessages, userMessage]);

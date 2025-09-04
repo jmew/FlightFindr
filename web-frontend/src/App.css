@@ -13,6 +13,13 @@
   --gem-sys-shape--corner-large: 16px;
 }
 
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevent scrolling on the body */
+}
+
 body {
   margin: 0;
   font-family: 'Google Sans', sans-serif;
@@ -23,6 +30,25 @@ body {
 /* On mobile, when chat is empty, explicitly prevent body scroll */
 body.empty-chat-mobile-lock {
   overflow: hidden;
+}
+
+/* Custom Scrollbar Styles */
+.chat-conversation::-webkit-scrollbar {
+  width: 12px;
+}
+
+.chat-conversation::-webkit-scrollbar-track {
+  background: var(--gem-sys-color--surface);
+}
+
+.chat-conversation::-webkit-scrollbar-thumb {
+  background-color: var(--gem-sys-color--surface-container);
+  border-radius: 6px;
+  border: 3px solid var(--gem-sys-color--surface);
+}
+
+.chat-conversation::-webkit-scrollbar-thumb:hover {
+  background-color: var(--gem-sys-color--surface-container); /* Explicitly keep the same color on hover */
 }
 
 /* Main App Layout */
@@ -131,16 +157,25 @@ body.empty-chat-mobile-lock {
 /* Mobile-specific adjustments */
 @media (max-width: 768px) {
   .main-content {
-    padding: 0 8px; /* Reduced horizontal padding */
+    padding: 0; /* Remove horizontal padding */
   }
   .chat-conversation {
-    padding: 16px 0;
+    padding: 16px 8px; /* Keep some padding for messages */
     padding-top: 20px;
   }
   .input-area {
     padding: 16px;
     padding-bottom: 20px;
     background-color: var(--gem-sys-color--surface);
+  }
+
+  .deal-filters-container {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 8px; /* Add some padding back inside */
+    padding-right: 8px;
+    box-sizing: border-box; /* Ensure padding is included in width */
   }
 
   /* Smaller text in deals table */
@@ -158,13 +193,9 @@ body.empty-chat-mobile-lock {
   }
 
   .deal-row {
-    grid-template-columns: 1fr 1.8fr 1.2fr 1.2fr 0.5fr; /* Adjust column proportions */
+    grid-template-columns: 1fr 2.2fr 1fr 1.2fr 0.5fr; /* Adjust column proportions */
     gap: 8px; /* Tighter gap */
     padding: 12px 8px; /* Tighter padding */
-  }
-
-  .flight-deals-container {
-    padding: 0;
   }
 }
 
@@ -524,7 +555,7 @@ body.empty-chat-mobile-lock {
 
 .deal-row {
   display: grid;
-  grid-template-columns: 1fr 2fr 1.5fr 1.5fr 0.5fr; /* 5 columns */
+  grid-template-columns: 1fr 2.5fr 1fr 1.5fr 0.5fr; /* 5 columns */
   align-items: center;
   padding: 16px;
   cursor: pointer;
@@ -717,6 +748,9 @@ body.empty-chat-mobile-lock {
   flex-grow: 1;
   overflow-x: auto; /* Enable horizontal scrolling */
   scrollbar-width: none; /* Firefox */
+}
+
+.filter-chips-scroll-container.is-scrollable {
   -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,1) 95%, rgba(0,0,0,0) 100%);
   mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,1) 95%, rgba(0,0,0,0) 100%);
 }
@@ -813,6 +847,34 @@ body.empty-chat-mobile-lock {
 .bank-logo {
   font-size: 20px; /* Slightly smaller for bank logos */
   color: #003B73; /* Default Citi color */
+  position: relative;
+}
+
+.tooltip-container {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip-container .tooltip-text {
+  visibility: hidden;
+  width: max-content;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 10px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%; /* Position the tooltip above the icon */
+  left: 50%;
+  margin-left: -60px; /* Use half of the width to center the tooltip */
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
 }
 
 .price-filter-label {

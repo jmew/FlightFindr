@@ -33,6 +33,14 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
 
   const airlineName = deal.airlines && deal.airlines.length === 1 ? getAirlineNameByCode(deal.airlines[0]) : 'Mixed';
 
+  const getDisplayName = (name: string) => {
+    if (name === 'American Airlines') return 'American';
+    if (name === 'Alaska Airlines') return 'Alaska';
+    return name;
+  };
+
+  const displayName = getDisplayName(airlineName);
+
   const routeString =
     deal.stops && deal.stops.length === 0
       ? `${origin} → ${destination}`
@@ -49,9 +57,9 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
                 ? deal.airlines[0]
                 : undefined
             }
-            name={airlineName}
+            name={displayName}
           />
-          <span className="airline-name">{airlineName}</span>
+          <span className="airline-name">{displayName}</span>
         </div>
         <div className="section time-info">
           <span className="time">
