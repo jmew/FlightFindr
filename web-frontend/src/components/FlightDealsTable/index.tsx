@@ -14,9 +14,10 @@ import { getAirlineNameByCode } from '../../utils/airlineMappings';
 interface DealRowProps {
   deal: FlightDeal;
   cabin: 'economy' | 'premium' | 'business' | 'first';
+  showDate: boolean;
 }
 
-const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
+const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const cabinData = deal[cabin];
 
@@ -69,6 +70,11 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
           <span className="airline-name">{displayName}</span>
         </div>
         <div className="section time-info">
+          {showDate && (
+            <div style={{ fontSize: '0.8em', fontFamily: 'roboto', color: 'var(--gem-sys-color--on-surface-variant)' }}>
+              {new Date(deal.date.replace(/-/g, '/')).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </div>
+          )}
           <span className="time">
             {departureTime} → {arrivalTime}
             {isNextDay && <sup>+1</sup>}
@@ -265,6 +271,12 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
     };
   }, []);
 
+  const showDates = useMemo(() => {
+    if (deals.length <= 1) return false;
+    const firstDate = deals[0].date;
+    return !deals.every(deal => deal.date === firstDate);
+  }, [deals]);
+
   const { availablePrograms, minPoints, maxPoints, shortestDuration } = useMemo(() => {
     const programs = new Set<string>();
     let min = Infinity;
@@ -431,6 +443,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
                   | 'business'
                   | 'first'
               }
+              showDate={showDates}
             />
           </React.Fragment>
         ))}
