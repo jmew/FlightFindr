@@ -2,4 +2,4 @@ fastmcp
 playwright
 uvicorn
 fast-flights
-airportsdata
+airportsdatagoogle-search-results

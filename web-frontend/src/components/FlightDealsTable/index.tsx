@@ -46,6 +46,13 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
       ? `${origin} → ${destination}`
       : `${origin} → ${deal.stops && deal.stops.join(' → ')} → ${destination}`;
 
+  const getCppColor = (cpp: number | string) => {
+    if (typeof cpp === 'string') return 'inherit';
+    if (cpp > 1.2) return '#81c995';
+    if (cpp < 1) return '#f28b82';
+    return 'inherit';
+  };
+
   return (
     <div className="deal-row-container">
       <div className="deal-row" onClick={() => setIsExpanded(!isExpanded)}>
@@ -88,7 +95,6 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
         </div>
         <div className="section points-info">
           <div className="points-value">
-            {points.toLocaleString()} pts
             {bonus && (
               <span
                 title={`Transfer Bonus: ${bonus.percentage}% from ${bonus.bank}`}
@@ -97,13 +103,31 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
                 <FiStar />
               </span>
             )}
+            {deal.program.split(' ')[0].toLowerCase() !== airlineName.split(' ')[0].toLowerCase() && (
+              <div className="tooltip-container">
+                <span style={{ color: 'var(--gem-sys-color--primary)' }}>*</span>
+                <span className="tooltip-text">Book with {deal.program}</span>
+              </div>
+            )}
+            {points.toLocaleString()}<span style={{ fontSize: '0.5em' }}> pts</span>
           </div>
           <div className="fees">
-            + {fees}{' '}
-            {deal.program.split(' ')[0].toLowerCase() !== airlineName.split(' ')[0].toLowerCase() &&
-              `(${deal.program})`}
+            + {fees}
           </div>
         </div>
+        {cabinData.cheapest_cpp && (
+          <div className="section cpp-info">
+            <div
+              className="points-value"
+              style={{ color: getCppColor(cabinData.exact_cpp !== 'N/A' ? cabinData.exact_cpp! : cabinData.cheapest_cpp) }}
+            >
+                {cabinData.exact_cpp !== 'N/A' ? `${cabinData.exact_cpp}¢` : `${cabinData.cheapest_cpp}¢`} / pt
+            </div>
+            <div className="fees">
+                (Cash) ${cabinData.exact_cash_price !== 'N/A' ? cabinData.exact_cash_price : cabinData.cheapest_cash_price}
+            </div>
+          </div>
+        )}
         <div className="section details-toggle">
           {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
         </div>

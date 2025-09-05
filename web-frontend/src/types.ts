@@ -36,6 +36,10 @@ interface CabinDeal {
     percentage: number;
     end_date: string;
   } | null;
+  cheapest_cash_price?: number;
+  cheapest_cpp?: number;
+  exact_cash_price?: number | string;
+  exact_cpp?: number | string;
 }
 
 export interface FlightDeal {

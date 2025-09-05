@@ -7,10 +7,15 @@ import json
 import asyncio
 import os
 from typing import List, Dict, Any, Optional
-from scrapers.utils import parse_time, get_flight_cash_prices
+from scrapers.utils import parse_time, fetch_cash_prices
 from datetime import datetime
-from fast_flights import get_flights, FlightData, Passengers
 
+
+async def scrape_cash_prices_for_all_cabins(origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    cash_price_tasks = []
+    for cabin in ['economy', 'premium', 'business', 'first']:
+        cash_price_tasks.append(fetch_cash_prices(origin, destination, start_date, cabin))
+    return await asyncio.gather(*cash_price_tasks)
 
 
 class PointsYeahScraper:
@@ -108,27 +113,91 @@ class PointsYeahScraper:
 
         try:
             search_url = self._build_search_url(origin, destination, start_date, end_date)
-            await self.page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
+            points_task = asyncio.create_task(self.page.goto(search_url, timeout=90000, wait_until='domcontentloaded'))
+            cash_task = asyncio.create_task(scrape_cash_prices_for_all_cabins(origin, destination, start_date, end_date))
+
             await asyncio.wait_for(search_done_future, timeout=120)
             print("Search complete (detected 'done' signal).")
+
+            # Wait for both tasks to complete
+            processed_deals_list, cash_prices_list = await asyncio.gather(
+                asyncio.create_task(asyncio.sleep(0, result=list(best_deals.values()))),
+                cash_task
+            )
+
         except asyncio.TimeoutError:
             print("Timed out waiting for the 'done' signal from the server.")
+            return []
         except Exception as e:
             print(f"An error occurred during scraping: {e}")
+            return []
         finally:
             self.page.remove_listener("response", handle_response)
-        
-        processed_deals = list(best_deals.values())
 
-        # Commenting this out for now becvause its slow
-        # cash_price_tasks = []
-        # for deal in processed_deals:
-        #     for cabin in ['economy', 'premium', 'business', 'first']:
-        #         cash_price_tasks.append(get_flight_cash_prices(deal, cabin))
-        
-        # await asyncio.gather(*cash_price_tasks)
+        # Match cash prices to deals
+        for deal in processed_deals_list:
+            for cabin_prices in cash_prices_list:
+                cabin = cabin_prices['cabin']
+                if not deal.get(cabin) or not deal[cabin].get('points'):
+                    continue
 
-        return processed_deals
+                flights = cabin_prices['flights']
+                if not flights:
+                    continue
+
+                # Cheapest cash price
+                cheapest_flight = min(flights, key=lambda x: x['price'])
+                cheapest_price = cheapest_flight['price']
+                points = deal[cabin]['points']
+                cheapest_cpp = (cheapest_price / points) * 100 if points > 0 else 0
+                deal[cabin]['cheapest_cash_price'] = cheapest_price
+                deal[cabin]['cheapest_cpp'] = round(cheapest_cpp, 2)
+
+                # Find exact match
+                exact_match_flight = None
+                award_departure_time = parse_time(deal.get('departure_time'))
+                award_flight_numbers = deal.get('flight_numbers', [])
+                award_stops = deal.get('stops', [])
+
+                for flight in flights:
+                    if not flight.get('flights'):
+                        continue
+                    
+                    cash_departure_time = parse_time(flight['flights'][0]['departure_airport'].get('time'))
+                    cash_flight_numbers = [f.get('flight_number').replace(' ', '') for f in flight.get('flights', [])]
+                    cash_layovers = [l.get('id') for l in flight.get('layovers', [])]
+                    award_flight_numbers_normalized = [fn.replace(' ', '') for fn in award_flight_numbers]
+
+                    # Match departure time (hour and minute)
+                    time_match = award_departure_time and cash_departure_time and award_departure_time.hour == cash_departure_time.hour and award_departure_time.minute == cash_departure_time.minute
+                    
+                    # Match flight numbers
+                    numbers_match = set(award_flight_numbers_normalized) == set(cash_flight_numbers)
+
+                    # Match layovers
+                    layovers_match = set(award_stops) == set(cash_layovers)
+
+                    if time_match and numbers_match and layovers_match:
+                        exact_match_flight = flight
+                        break
+            
+                if exact_match_flight:
+                    exact_price = exact_match_flight['price']
+                    exact_cpp = (exact_price / points) * 100 if points > 0 else 0
+                    deal[cabin]['exact_cash_price'] = exact_price
+                    deal[cabin]['exact_cpp'] = round(exact_cpp, 2)
+                else:
+                    deal[cabin]['exact_cash_price'] = 'N/A'
+                    deal[cabin]['exact_cpp'] = 'N/A'
+
+        # Filter out deals that don't match the requested origin and destination
+        filtered_deals = []
+        for deal in processed_deals_list:
+            deal_origin, deal_destination = deal['route'].split(' -> ')
+            if deal_origin == origin and deal_destination == destination:
+                filtered_deals.append(deal)
+
+        return filtered_deals
 
     def _build_search_url(self, origin: str, destination: str, start_date: str, end_date: str) -> str:
         multiday = "true" if start_date != end_date else "false"
@@ -152,7 +221,6 @@ class PointsYeahScraper:
         for deal in deals_chunk:
             if not deal.get("routes"): continue
             program_name, deal_date = deal.get("program"), deal.get("date")
-            route_str = f"{deal.get('departure')} -> {deal.get('arrival')}"
 
             for route in deal["routes"]:
                 booking_url = route.get("url", "") # Explicitly get URL from the route
@@ -165,6 +233,11 @@ class PointsYeahScraper:
                 valid_segments = [s for s in segments if s.get("flight_number")]
                 if not valid_segments:
                     continue
+
+                # Get the correct arrival airport from the last segment
+                departure_airport = valid_segments[0].get('da')
+                arrival_airport = valid_segments[-1].get('aa')
+                route_str = f"{departure_airport} -> {arrival_airport}"
 
                 stops = [s.get('aa') for s in valid_segments[:-1]]
                 airlines = list(set([s.get('flight_number')[:2] for s in valid_segments if s.get('flight_number')]))
@@ -266,7 +339,7 @@ async def main_test():
     try:
         await initialize_scraper(playwright)
         
-        deals = await scrape_pointsyeah("SEA", "GEG", "2025-10-04", "2025-10-04")
+        deals = await scrape_pointsyeah("SEA", "JFK", "2025-10-04", "2025-10-04")
         if deals:
             print(f"Found {len(deals)} deals.")
             # output_filename = "deals.json"

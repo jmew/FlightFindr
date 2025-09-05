@@ -61,7 +61,7 @@ body.empty-chat-mobile-lock {
 
 .main-content {
   width: 100%;
-  max-width: 760px;
+  max-width: 860px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -555,11 +555,15 @@ body.empty-chat-mobile-lock {
 
 .deal-row {
   display: grid;
-  grid-template-columns: 1fr 2.5fr 1fr 1.5fr 0.5fr; /* 5 columns */
+  grid-template-columns: 0.5fr 2fr 1fr 1fr 1.25fr 0.5fr; /* 6 columns */
   align-items: center;
   padding: 16px;
   cursor: pointer;
   gap: 16px;
+}
+
+.cpp-info {
+  align-items: flex-end;
 }
 
 .deal-row .section {
@@ -838,10 +842,6 @@ body.empty-chat-mobile-lock {
   align-items: center;
   justify-content: center;
   font-size: 24px;
-}
-
-.airline-logo {
-  /* Keep default size for airline logo emoji */
 }
 
 .bank-logo {
