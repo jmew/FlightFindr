@@ -115,18 +115,20 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin }) => {
             + {fees}
           </div>
         </div>
-        {cabinData.cheapest_cpp && (
+        {cabinData.exact_cpp && cabinData.exact_cpp !== 'N/A' ? (
           <div className="section cpp-info">
             <div
               className="points-value"
-              style={{ color: getCppColor(cabinData.exact_cpp !== 'N/A' ? cabinData.exact_cpp! : cabinData.cheapest_cpp) }}
+              style={{ color: getCppColor(cabinData.exact_cpp) }}
             >
-                {cabinData.exact_cpp !== 'N/A' ? `${cabinData.exact_cpp}¢` : `${cabinData.cheapest_cpp}¢`} / pt
+                {`${cabinData.exact_cpp}¢`} / pt
             </div>
             <div className="fees">
-                (Cash) ${cabinData.exact_cash_price !== 'N/A' ? cabinData.exact_cash_price : cabinData.cheapest_cash_price}
+                (Cash) ${cabinData.exact_cash_price}
             </div>
           </div>
+        ) : (
+          <div />
         )}
         <div className="section details-toggle">
           {isExpanded ? <FiChevronUp /> : <FiChevronDown />}

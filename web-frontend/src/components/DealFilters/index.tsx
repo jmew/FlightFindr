@@ -66,7 +66,7 @@ const FilterChip: React.FC<FilterChipProps> = ({
         )}
       </Dropdown.Toggle>
 
-      <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
+      <Dropdown.Menu popperConfig={{ strategy: 'fixed' }} renderOnMount>
         {options &&
           options.map((option) => (
             <Dropdown.ItemText key={option} onClick={(e) => e.stopPropagation()}>
