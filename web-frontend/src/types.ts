@@ -40,6 +40,7 @@ interface CabinDeal {
   cheapest_cpp?: number;
   exact_cash_price?: number | string;
   exact_cpp?: number | string;
+  cash_flight_details?: any;
 }
 
 export interface FlightDeal {

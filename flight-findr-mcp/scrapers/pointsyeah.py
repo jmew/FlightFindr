@@ -186,9 +186,11 @@ class PointsYeahScraper:
                     exact_cpp = (exact_price / points) * 100 if points > 0 else 0
                     deal[cabin]['exact_cash_price'] = exact_price
                     deal[cabin]['exact_cpp'] = round(exact_cpp, 2)
+                    deal[cabin]['cash_flight_details'] = exact_match_flight
                 else:
                     deal[cabin]['exact_cash_price'] = 'N/A'
                     deal[cabin]['exact_cpp'] = 'N/A'
+                    deal[cabin]['cash_flight_details'] = None
 
         # Filter out deals that don't match the requested origin and destination
         filtered_deals = []

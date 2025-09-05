@@ -11,13 +11,82 @@ import type { FlightDeal } from '../../types';
 import { formatDuration, formatFlightTimes } from '../../utils/formatters';
 import { getAirlineNameByCode } from '../../utils/airlineMappings';
 
+const CashFlightDetails = ({ details }: { details: any }) => {
+  if (!details || !details.flights) return null;
+
+  return (
+    <div className="cash-flight-details" style={{ marginTop: '16px' }}>
+      {details.flights.map((segment: any, index: number) => (
+        <React.Fragment key={index}>
+          <div className="segment-details" style={{ marginBottom: '12px' }}>
+            <div>
+              {segment.departure_airport.time} • {segment.departure_airport.name} ({
+                segment.departure_airport.id
+              })
+            </div>
+            <div
+              style={{
+                marginLeft: '10px',
+                color: 'var(--gem-sys-color--on-surface-variant)',
+              }}
+            >
+              Travel time: {formatDuration(segment.duration)}
+            </div>
+            <div>
+              {segment.arrival_airport.time} • {segment.arrival_airport.name} ({
+                segment.arrival_airport.id
+              })
+            </div>
+
+            <p
+              style={{
+                margin: '4px 0 0 10px',
+                color: 'var(--gem-sys-color--on-surface-variant)',
+              }}
+            >
+              {segment.airline} {segment.flight_number} • {segment.aircraft}
+            </p>
+            {segment.amenities && (
+              <ul
+                style={{
+                  paddingLeft: '20px',
+                  margin: '8px 0',
+                  fontSize: '0.9em',
+                }}
+              >
+                {segment.amenities.map((amenity: any, i: number) => (
+                  <li key={i}>{amenity.description}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {details.layovers && details.layovers[index] && (
+            <div
+              className="layover-details"
+              style={{
+                marginLeft: '10px',
+                padding: '8px',
+                color: 'var(--gem-sys-color--on-surface-variant)',
+              }}
+            >
+              Layover: {details.layovers[index].duration} in{' '}
+              {details.layovers[index].name} ({details.layovers[index].id})
+            </div>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
+
 interface DealRowProps {
   deal: FlightDeal;
   cabin: 'economy' | 'premium' | 'business' | 'first';
   showDate: boolean;
+  hasCashPrice: boolean;
 }
 
-const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate }) => {
+const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const cabinData = deal[cabin];
 
@@ -31,6 +100,12 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate }) => {
     deal.departure_time,
     deal.arrival_time,
   );
+
+  const gridStyle = {
+    gridTemplateColumns: hasCashPrice
+      ? '0.5fr 2.2fr 1fr 1fr 1fr 0.1fr'
+      : '0.5fr 2.2fr 1fr 1fr 0.1fr',
+  };
 
   const airlineName = deal.airlines && deal.airlines.length === 1 ? getAirlineNameByCode(deal.airlines[0]) : 'Mixed';
 
@@ -56,7 +131,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate }) => {
 
   return (
     <div className="deal-row-container">
-      <div className="deal-row" onClick={() => setIsExpanded(!isExpanded)}>
+      <div className="deal-row" style={gridStyle} onClick={() => setIsExpanded(!isExpanded)}>
         <div className="section airline-info">
           <Logo
             type="airline"
@@ -117,39 +192,30 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate }) => {
             )}
             {points.toLocaleString()}<span style={{ fontSize: '0.5em' }}> pts</span>
           </div>
-          <div className="fees">
-            + {fees}
-          </div>
+          <div className="fees">+ {fees}</div>
         </div>
-        {cabinData.exact_cpp && cabinData.exact_cpp !== 'N/A' ? (
-          <div className="section cpp-info">
-            <div
-              className="points-value"
-              style={{ color: getCppColor(cabinData.exact_cpp) }}
-            >
+        {hasCashPrice &&
+          (cabinData.exact_cpp && cabinData.exact_cpp !== 'N/A' ? (
+            <div className="section cpp-info">
+              <div
+                className="points-value"
+                style={{ color: getCppColor(cabinData.exact_cpp) }}
+              >
                 {`${cabinData.exact_cpp}¢`} / pt
-            </div>
-            <div className="fees">
+              </div>
+              <div className="fees">
                 (Cash) ${cabinData.exact_cash_price}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div />
-        )}
+          ) : (
+            <div />
+          ))}
         <div className="section details-toggle">
           {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
         </div>
       </div>
       {isExpanded && (
         <div className="deal-row-expanded-details">
-          <div className="detail-item">
-            <strong>{origin}:</strong>
-            <span>{deal.origin_airport_info.name}</span>
-          </div>
-          <div className="detail-item">
-            <strong>{destination}:</strong>
-            <span>{deal.destination_airport_info.name}</span>
-          </div>
           <div className="detail-item">
             <strong>Flight Numbers:</strong> {deal.flight_numbers.join(', ')}
           </div>
@@ -168,12 +234,15 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate }) => {
           <div className="detail-item transfers">
             <strong>Transfer From:</strong>
             <div className="transfer-partners">
-              {transferPartners.map((partner: string) => (
-                <Logo key={partner} type="bank" name={partner} />
-              ))}
+                {transferPartners.map((partner: string) => (
+                  <Logo key={partner} type="bank" name={partner} />
+                ))}
+              </div>
             </div>
-          </div>
-          <a
+            {cabinData.cash_flight_details && (
+              <CashFlightDetails details={cabinData.cash_flight_details} />
+            )}
+            <a
             href={booking_url}
             target="_blank"
             rel="noopener noreferrer"
@@ -276,6 +345,8 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
     const firstDate = deals[0].date;
     return !deals.every(deal => deal.date === firstDate);
   }, [deals]);
+
+  
 
   const { availablePrograms, minPoints, maxPoints, shortestDuration } = useMemo(() => {
     const programs = new Set<string>();
@@ -418,6 +489,13 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
     });
   }, [filteredDeals, sortBy, minPoints, shortestDuration]);
 
+  const hasAnyCashPrice = useMemo(() => {
+    return sortedDeals.some(deal => {
+        const cabinData = deal[deal.displayCabin as keyof FlightDeal] as any;
+        return cabinData && cabinData.exact_cpp && cabinData.exact_cpp !== 'N/A';
+    });
+  }, [sortedDeals]);
+
   return (
     <>
       <div ref={sentinelRef} style={{ height: 1, width: '100%' }} />
@@ -444,6 +522,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
                   | 'first'
               }
               showDate={showDates}
+              hasCashPrice={hasAnyCashPrice}
             />
           </React.Fragment>
         ))}

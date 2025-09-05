@@ -47,6 +47,7 @@ def parse_time(time_str: str) -> Optional[datetime.time]:
 
 async def fetch_cash_prices(origin: str, destination: str, date: str, cabin: str) -> Dict[str, Any]:
     """Fetches cash prices for a given route and cabin."""
+    print(f"Fetching cash prices for {origin} -> {destination} on {date} (Cabin: {cabin})")
     try:
         travel_class_map = {
             'economy': 1,
@@ -71,7 +72,8 @@ async def fetch_cash_prices(origin: str, destination: str, date: str, cabin: str
 
         search = GoogleSearch(params)
         results = await asyncio.to_thread(search.get_dict)
-        
+
+        print(f"Successfully fetched {len(results.get('best_flights', [])) + len(results.get('other_flights', []))} cash flights for {origin} -> {destination}")
         return {"cabin": cabin, "flights": results.get('best_flights', []) + results.get('other_flights', [])}
 
     except Exception as e:
