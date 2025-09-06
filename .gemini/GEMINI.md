@@ -51,4 +51,31 @@ This project has specific behaviors and solutions that are critical to its opera
 
 ### Committing Changes
 
-IMPORTANT: After any change is confirmed to be working correctly (especially after a successful local test or build), stage all the changes with git to save the progress. And generate a commit message that summarizes the changes and actualyl commit it. This creates a stable checkpoint and is a critical best practice.
+After any change is confirmed to be working correctly (especially after a successful local test or build), stage all the changes with git to save the progress. Only stage it, do NOT commit it. This creates a stable checkpoint and is a critical best practice.
+
+When committing changes, especially with multi-line commit messages, it's best to use a temporary file to avoid shell quoting issues.
+
+1.  **Write the commit message to a temporary file:**
+    ```bash
+    # Use the write_file tool
+    write_file(
+        file_path=".git/commit_msg.txt",
+        content="<your commit message>"
+    )
+    ```
+
+2.  **Commit using the file:**
+    ```bash
+    # Use the run_shell_command tool
+    run_shell_command(
+        command="git commit -F .git/commit_msg.txt"
+    )
+    ```
+
+3.  **Remove the temporary file:**
+    ```bash
+    # Use the run_shell_command tool
+    run_shell_command(
+        command="rm .git/commit_msg.txt"
+    )
+    ```
