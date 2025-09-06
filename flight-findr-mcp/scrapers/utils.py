@@ -45,37 +45,46 @@ def parse_time(time_str: str) -> Optional[datetime.time]:
     except ValueError:
         return None
 
-async def fetch_cash_prices(origin: str, destination: str, date: str, cabin: str) -> Dict[str, Any]:
-    """Fetches cash prices for a given route and cabin."""
-    print(f"Fetching cash prices for {origin} -> {destination} on {date} (Cabin: {cabin})")
-    try:
-        travel_class_map = {
-            'economy': 1,
-            'premium': 2,
-            'business': 3,
-            'first': 4
-        }
-        travel_class = travel_class_map.get(cabin)
-        if not travel_class:
-            return {}
+async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cabin: str) -> Dict[str, Any]:
+    """Fetches cash prices for a given route and cabin across multiple dates in parallel."""
+    print(f"Fetching cash prices for {origin} -> {destination} (Cabin: {cabin}) on dates: {', '.join(dates)}")
+    
+    async def search_single_date(date: str):
+        try:
+            travel_class_map = {
+                'economy': 1,
+                'premium': 2,
+                'business': 3,
+                'first': 4
+            }
+            travel_class = travel_class_map.get(cabin)
+            if not travel_class:
+                return []
 
-        params = {
-            "engine": "google_flights",
-            "departure_id": origin,
-            "arrival_id": destination,
-            "outbound_date": date,
-            "adults": 1,
-            "travel_class": travel_class,
-            "type": 2, # one way
-            "api_key": os.getenv("SERPAPI_KEY"),
-        }
+            params = {
+                "engine": "google_flights",
+                "departure_id": origin,
+                "arrival_id": destination,
+                "outbound_date": date,
+                "adults": 1,
+                "travel_class": travel_class,
+                "type": 2, # one way
+                "api_key": os.getenv("SERPAPI_KEY"),
+            }
 
-        search = GoogleSearch(params)
-        results = await asyncio.to_thread(search.get_dict)
+            search = GoogleSearch(params)
+            results = await asyncio.to_thread(search.get_dict)
+            return results.get('best_flights', []) + results.get('other_flights', [])
 
-        print(f"Successfully fetched {len(results.get('best_flights', [])) + len(results.get('other_flights', []))} cash flights for {origin} -> {destination}")
-        return {"cabin": cabin, "flights": results.get('best_flights', []) + results.get('other_flights', [])}
+        except Exception as e:
+            print(f"Error getting cash price for {origin} -> {destination} on {date} ({cabin}): {e}")
+            return []
 
-    except Exception as e:
-        print(f"Error getting cash price for {origin} -> {destination} ({cabin}): {e}")
-        return {"cabin": cabin, "flights": []}
+    tasks = [search_single_date(date) for date in dates]
+    all_flights = await asyncio.gather(*tasks)
+    
+    # Flatten the list of lists
+    flat_list = [item for sublist in all_flights for item in sublist]
+    
+    print(f"Successfully fetched {len(flat_list)} cash flights for {origin} -> {destination} ({cabin})")
+    return {"cabin": cabin, "flights": flat_list}

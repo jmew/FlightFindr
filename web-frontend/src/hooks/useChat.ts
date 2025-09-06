@@ -1,6 +1,31 @@
 import { useState, useEffect, useRef } from 'react';
 import type { FlightDeal } from '../types';
 import type { Message, Tool } from '../types';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
+
+function parseMultiCityMessage(message: string) {
+  const startMatch = message.match(/I want to start in (.*?) and end in (.*?)\. /);
+  const startLocation = startMatch ? startMatch[1] : '';
+  const endLocation = startMatch ? startMatch[2] : '';
+
+  const stopsMatch = message.match(/I want to visit the following places: (.*?)\. /);
+  const intermediateStops = stopsMatch ? stopsMatch[1].split(', ') : [];
+
+  const datesMatch = message.match(/I want to travel between (.*?) and (.*?),/);
+  const startDate = datesMatch ? datesMatch[1] : '';
+  const endDate = datesMatch ? datesMatch[2] : '';
+
+  const maxLengthMatch = message.match(/with a maximum trip length of (.*?) days/);
+  const maxLength = maxLengthMatch ? maxLengthMatch[1] : '';
+
+  const flexibleMatch = message.match(/The order of the intermediate stops is flexible\. /);
+  const flexible = !!flexibleMatch;
+
+  const constraintsMatch = message.match(/Please also consider the following constraints: (.*)/);
+  const constraints = constraintsMatch ? constraintsMatch[1] : '';
+
+  return { startLocation, endLocation, intermediateStops, startDate, endDate, maxLength, constraints, flexible };
+}
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -70,122 +95,132 @@ export function useChat() {
     }
 
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://web-server-304334704110.us-central1.run.app';
-    const eventSource = new EventSource(
-      `${baseUrl}/chat?message=${encodeURIComponent(
-        message,
-      )}&sessionId=${sessionIdRef.current}`,
-    );
-    eventSourceRef.current = eventSource;
-
     let currentBotMessage = '';
     let botMessageIndex = -1;
 
-    eventSource.onopen = () => {};
-
-    eventSource.addEventListener('content', (event) => {
+    const onMessage = (event: any) => {
       const data = JSON.parse(event.data);
-      currentBotMessage += data.chunk;
-
-      setMessages((prevMessages) => {
-        const newMessages = [...prevMessages];
-        if (botMessageIndex === -1) {
-          botMessageIndex = newMessages.length;
-          newMessages.push({ sender: 'bot', text: currentBotMessage });
-        } else {
-          newMessages[botMessageIndex] = {
-            ...newMessages[botMessageIndex],
-            text: currentBotMessage,
+      switch (event.event) {
+        case 'content':
+          currentBotMessage += data.chunk;
+          setMessages((prevMessages) => {
+            const newMessages = [...prevMessages];
+            if (botMessageIndex === -1) {
+              botMessageIndex = newMessages.length;
+              newMessages.push({ sender: 'bot', text: currentBotMessage });
+            } else {
+              newMessages[botMessageIndex] = {
+                ...newMessages[botMessageIndex],
+                text: currentBotMessage,
+              };
+            }
+            return newMessages;
+          });
+          break;
+        case 'thought':
+          setThought(data.subject || data.description || 'Thinking...');
+          break;
+        case 'tool_code':
+          const newTool: Tool = {
+            callId: data.callId,
+            name: data.name,
+            args: data.args,
           };
-        }
-        return newMessages;
-      });
-    });
-
-    eventSource.addEventListener('thought', (event) => {
-      const data = JSON.parse(event.data);
-      setThought(data.subject || data.description || 'Thinking...');
-    });
-
-    eventSource.addEventListener('tool_code', (event) => {
-      const data = JSON.parse(event.data);
-      const newTool: Tool = {
-        callId: data.callId,
-        name: data.name,
-        args: data.args,
-      };
-
-      setMessages((prev) => {
-        const lastMessage = prev[prev.length - 1];
-        if (lastMessage?.sender === 'bot' && lastMessage.tools) {
-          const updatedMessages = [...prev];
-          updatedMessages[prev.length - 1] = {
-            ...lastMessage,
-            tools: [...lastMessage.tools, newTool],
-          };
-          return updatedMessages;
-        } else {
-          const newToolMessage: Message = {
-            sender: 'bot',
-            text: '',
-            tools: [newTool],
-          };
-          return [...prev, newToolMessage];
-        }
-      });
-    });
-
-    eventSource.addEventListener('tool_result', (event) => {
-      const data = JSON.parse(event.data);
-      setMessages((prev) =>
-        prev.map((msg) => {
-          if (msg.tools && msg.tools.some((t: Tool) => t.callId === data.callId)) {
-            let newFlightData = msg.flightData || [];
-            const updatedTools = msg.tools.map((tool: Tool) => {
-              if (tool.callId === data.callId) {
-                const updatedTool = {
-                  ...tool,
-                  result: data.result,
-                  error: data.error,
-                };
-
-                if (tool.name === 'check_flight_points_prices') {
-                  try {
-                    const parsedResult = JSON.parse(data.result);
-                    if (parsedResult.all_deals) {
-                      const parsedFlightData: FlightDeal[] = parsedResult.all_deals.map((deal: any, index: number) => ({
-                        ...deal,
-                        id: `${deal.route}-${deal.departure_time}-${index}`, // Create a more stable ID
-                      }));
-                      newFlightData = [...newFlightData, ...parsedFlightData];
+          setMessages((prev) => {
+            const lastMessage = prev[prev.length - 1];
+            if (lastMessage?.sender === 'bot' && lastMessage.tools) {
+              const updatedMessages = [...prev];
+              updatedMessages[prev.length - 1] = {
+                ...lastMessage,
+                tools: [...lastMessage.tools, newTool],
+              };
+              return updatedMessages;
+            } else {
+              const newToolMessage: Message = {
+                sender: 'bot',
+                text: '',
+                tools: [newTool],
+              };
+              return [...prev, newToolMessage];
+            }
+          });
+          break;
+        case 'error':
+          setMessages((prev) => [...prev, { sender: 'bot', text: `An error occurred: ${data.error}` }]);
+          stopStreaming();
+          break;
+        case 'tool_result':
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.tools && msg.tools.some((t: Tool) => t.callId === data.callId)) {
+                let newFlightData = msg.flightData || [];
+                const updatedTools = msg.tools.map((tool: Tool) => {
+                  if (tool.callId === data.callId) {
+                    const updatedTool = {
+                      ...tool,
+                      result: data.result,
+                      error: data.error,
+                    };
+                    if (tool.name === 'check_flight_points_prices') {
+                      try {
+                        const parsedResult = JSON.parse(data.result);
+                        if (parsedResult.all_deals) {
+                          const parsedFlightData: FlightDeal[] = parsedResult.all_deals.map((deal: any, index: number) => ({
+                            ...deal,
+                            id: `${deal.route}-${deal.departure_time}-${index}`,
+                          }));
+                          newFlightData = [...newFlightData, ...parsedFlightData];
+                        }
+                      } catch (e) {
+                        console.error('Error parsing flight data:', e);
+                      }
                     }
-                  } catch (e) {
-                    console.error('Error parsing flight data:', e);
+                    return updatedTool;
                   }
-                }
-                return updatedTool;
+                  return tool;
+                });
+                return { ...msg, tools: updatedTools, flightData: newFlightData };
               }
-              return tool;
-            });
-            return { ...msg, tools: updatedTools, flightData: newFlightData };
-          }
-          return msg;
-        }),
+              return msg;
+            }),
+          );
+          break;
+      }
+    };
+
+    if (message.startsWith('Find a multi-city trip for me.')) {
+      const body = parseMultiCityMessage(message);
+      fetchEventSource(`${baseUrl}/multi-city?sessionId=${sessionIdRef.current}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        onmessage: onMessage,
+        onclose: () => stopStreaming(),
+        onerror: (err) => {
+          console.error('EventSource failed:', err);
+          setMessages((prev) => [...prev, { sender: 'bot', text: 'An unexpected error occurred. Please check the console for details.' }]);
+          stopStreaming();
+        },
+      });
+    } else {
+      const eventSource = new EventSource(
+        `${baseUrl}/chat?message=${encodeURIComponent(
+          message,
+        )}&sessionId=${sessionIdRef.current}`,
       );
-    });
-
-    eventSource.addEventListener('end', () => {
-      stopStreaming();
-    });
-
-    eventSource.addEventListener('error', (event) => {
-      console.error('EventSource failed:', event);
-      const errorMessage: Message = {
-        sender: 'bot',
-        text: 'Sorry, something went wrong. Please check the server console and try again.',
-      };
-      setMessages((prevMessages) => [...prevMessages, errorMessage]);
-      stopStreaming();
-    });
+      eventSourceRef.current = eventSource;
+      eventSource.addEventListener('content', (event) => onMessage({ event: 'content', data: event.data }));
+      eventSource.addEventListener('thought', (event) => onMessage({ event: 'thought', data: event.data }));
+      eventSource.addEventListener('tool_code', (event) => onMessage({ event: 'tool_code', data: event.data }));
+      eventSource.addEventListener('tool_result', (event) => onMessage({ event: 'tool_result', data: event.data }));
+      eventSource.addEventListener('end', () => stopStreaming());
+      eventSource.addEventListener('error', (err) => {
+        console.error('EventSource failed:', err);
+        stopStreaming();
+      });
+    }
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {

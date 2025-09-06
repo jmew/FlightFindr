@@ -91,9 +91,8 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
 
   return (
     <div className={`main-content ${isChatEmpty ? 'empty-chat' : ''}`}>
-      {isChatEmpty ? (
-        <WelcomeScreen />
-      ) : (
+      <WelcomeScreen handleSendMessage={handleSuggestionClick} isChatEmpty={isChatEmpty} />
+      {!isChatEmpty && (
         <div className="chat-conversation">
           <MessageList
             messages={messages}

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@icons-pack/react-simple-icons": "^13.7.0",
+    "@microsoft/fetch-event-source": "^2.0.1",
     "@types/node": "^24.3.0",
     "axios": "^1.11.0",
     "bootstrap": "^5.3.8",

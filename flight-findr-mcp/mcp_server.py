@@ -38,10 +38,6 @@ class FlightSearchMCP(FastMCP):
             self.check_flight_points_prices,
             description="Finds the best flight deals using points and cash from various sources.",
         ))
-        self.add_tool(Tool.from_function(
-            self.get_airport_info,
-            description="Gets information about an airport from its IATA code.",
-        ))
 
     def get_airport_info(self, iata_code: str) -> Dict[str, Any]:
         """Returns airport information for a given IATA code."""
@@ -49,36 +45,40 @@ class FlightSearchMCP(FastMCP):
             return {"error": "Airport data not loaded"}
         return airports.get(iata_code, {"error": "Airport not found"})
 
+
     async def check_flight_points_prices(
         self,
-        origin_airports: List[str],
-        destination_airports: List[str],
-        start_date: str,
-        end_date: str,
-        programs: Optional[List[str]] = None,
-        alliances: Optional[List[str]] = None,
-        transfer_partners: Optional[List[str]] = None,
-        points_min: Optional[int] = None,
-        points_max: Optional[int] = None,
-        days: Optional[int] = None,
+        searches: List[Dict[str, Any]],
     ) -> str:
         """
-        Checks for flight points prices across different platforms.
+        Checks for flight points prices across different platforms for a list of searches.
+        Each search should be a dictionary with origin_airports, destination_airports, start_date, and end_date.
         """
-        origin_str = ",".join(origin_airports)
-        dest_str = ",".join(destination_airports)
-
-        print(f"Searching for flights from {origin_str} to {dest_str} between {start_date} and {end_date}...")
-
+        
         all_deals = []
-        try:
-            pointsyeah_deals = await pointsyeah.scrape_pointsyeah(origin_str, dest_str, start_date, end_date)
-            for deal in pointsyeah_deals:
-                deal["source"] = "pointsyeah"
-            all_deals.extend(pointsyeah_deals)
-            print(f"Found {len(pointsyeah_deals)} deals on pointsyeah")
-        except Exception as e:
-            print(f"An unexpected error occurred during scraping: {e}")
+        
+        async def run_search(search_query: Dict[str, Any]):
+            origin_str = ",".join(search_query['origin_airports'])
+            dest_str = ",".join(search_query['destination_airports'])
+            start_date = search_query['start_date']
+            end_date = search_query['end_date']
+            
+            print(f"Searching for flights from {origin_str} to {dest_str} between {start_date} and {end_date}...")
+            
+            try:
+                pointsyeah_deals = await pointsyeah.scrape_pointsyeah(origin_str, dest_str, start_date, end_date)
+                for deal in pointsyeah_deals:
+                    deal["source"] = "pointsyeah"
+                return pointsyeah_deals
+            except Exception as e:
+                print(f"An unexpected error occurred during scraping: {e}")
+                return []
+
+        tasks = [run_search(search) for search in searches]
+        results = await asyncio.gather(*tasks)
+        
+        for result in results:
+            all_deals.extend(result)
 
         if not all_deals:
             return json.dumps({"all_deals": [], "cheapest_deal": None}, indent=2)
@@ -156,13 +156,12 @@ async def startup_event():
     print("Scrapers initialized.")
 
 async def shutdown_event():
-    """Closes the scrapers and playwright instance."""
-    global playwright_instance
-    print("Server shutting down, closing scrapers...")
-    await pointsyeah.close_scraper()
-    if playwright_instance:
-        await playwright_instance.stop()
-    print("Scrapers and Playwright closed.")
+    """Closes the global scraper instance."""
+    global scraper_instance
+    if scraper_instance:
+        print("Closing PointsYeah scraper at server shutdown...")
+        await scraper_instance.close()
+        scraper_instance = None
 
 async def main_async(args):
     """Runs startup, the server, and shutdown."""

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { chatHandler } from './chatHandler.js';
 import { suggestionHandler } from './suggestionHandler.js';
+import { multiCityHandler } from './multiCityHandler.js';
 
 async function main() {
   const app = express();
@@ -17,6 +18,7 @@ async function main() {
   }
 
   app.get('/chat', chatHandler);
+  app.post('/multi-city', multiCityHandler);
   app.get('/suggestions', suggestionHandler);
 
   // Add a health check route for Render

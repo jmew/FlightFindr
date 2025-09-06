@@ -8,13 +8,20 @@ import asyncio
 import os
 from typing import List, Dict, Any, Optional
 from scrapers.utils import parse_time, fetch_cash_prices
-from datetime import datetime
-
+from datetime import datetime, timedelta
 
 async def scrape_cash_prices_for_all_cabins(origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    # Generate a list of dates between start_date and end_date
+    dates = []
+    current_date = datetime.fromisoformat(start_date)
+    end = datetime.fromisoformat(end_date)
+    while current_date <= end:
+        dates.append(current_date.strftime('%Y-%m-%d'))
+        current_date += timedelta(days=1)
+
     cash_price_tasks = []
     for cabin in ['economy', 'premium', 'business', 'first']:
-        cash_price_tasks.append(fetch_cash_prices(origin, destination, start_date, cabin))
+        cash_price_tasks.append(fetch_cash_prices(origin, destination, dates, cabin))
     return await asyncio.gather(*cash_price_tasks)
 
 

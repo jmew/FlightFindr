@@ -1,0 +1,76 @@
+/* WelcomeScreen.css */
+
+.search-form-container {
+  background-color: var(--gem-sys-color--surface-container);
+  padding: 20px;
+  border-radius: var(--gem-sys-shape--corner-large);
+  margin-top: 24px;
+  max-width: 800px; /* Limit form width */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.nav-tabs .nav-link {
+  color: var(--gem-sys-color--on-surface-variant);
+  border: none;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--gem-sys-color--primary);
+  background-color: transparent;
+  border-bottom: 2px solid var(--gem-sys-color--primary);
+}
+
+.nav-tabs {
+  border-bottom: 1px solid var(--gem-sys-color--surface);
+}
+
+.tab-content {
+  padding-top: 1rem;
+}
+
+.input-group-text {
+    background-color: var(--gem-sys-color--surface);
+    border-color: var(--gem-sys-color--surface);
+    color: var(--gem-sys-color--on-surface-variant);
+}
+
+.form-control {
+    background-color: var(--gem-sys-color--surface);
+    border-color: var(--gem-sys-color--surface);
+    color: var(--gem-sys-color--on-surface);
+}
+
+.form-control:focus {
+    background-color: var(--gem-sys-color--surface);
+    border-color: var(--gem-sys-color--primary);
+    color: var(--gem-sys-color--on-surface);
+    box-shadow: none;
+}
+
+.form-control::placeholder,
+.input-field::placeholder {
+  color: var(--gem-sys-color--on-surface-variant);
+  opacity: 1; /* Override default opacity */
+}
+
+.leg-row .btn-danger {
+    background-color: #dc3545;
+    border: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .leg-row {
+    display: flex;
+    flex-direction: column;
+  }
+  .leg-row > .col-md-5, .leg-row > .col-md-2 {
+    width: 100%;
+    margin-bottom: 0.5rem; /* Add some space between stacked inputs */
+  }
+  .leg-row .text-end {
+    text-align: left !important;
+  }
+}
