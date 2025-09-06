@@ -10,7 +10,6 @@ from typing import List, Dict, Any, Optional
 from scrapers.utils import parse_time, fetch_cash_prices, PROGRAM_MAPPING
 from datetime import datetime, timedelta
 import airportsdata
-import json
 
 
 # --- Airport Data ---
@@ -78,24 +77,15 @@ async def check_flight_points_prices(
     # Deduplicate and merge deals
     merged_deals = {}
     for deal in all_deals:
-        normalized_program = normalize_program_name(deal.get("program"))
-        if not normalized_program:
-            continue
-
         deal_id = (
             deal.get("date"),
             deal.get("route"),
-            normalized_program,
+            deal.get("program"),
             deal.get("departure_time"),
             deal.get("arrival_time"),
         )
 
         if deal_id not in merged_deals:
-            # Enrich with airport info
-            origin_code, dest_code = deal.get("route", " -> ").split(" -> ")
-            deal["origin_airport_info"] = get_airport_info(origin_code)
-            deal["destination_airport_info"] = get_airport_info(dest_code)
-            deal["program"] = normalized_program
             merged_deals[deal_id] = deal
         else:
             existing_deal = merged_deals[deal_id]
@@ -354,6 +344,9 @@ class PointsYeahScraper:
         for deal in deals_chunk:
             if not deal.get("routes"): continue
             program_name, deal_date = deal.get("program"), deal.get("date")
+            normalized_program = normalize_program_name(program_name)
+            if not normalized_program:
+                continue
 
             for route in deal["routes"]:
                 booking_url = route.get("url", "") # Explicitly get URL from the route
@@ -388,7 +381,7 @@ class PointsYeahScraper:
 
                 flight_numbers = [s.get("flight_number") for s in valid_segments if s.get("flight_number")]
                 departure_time, arrival_time = valid_segments[0].get("dt"), valid_segments[-1].get("at")
-                deal_key = (program_name, deal_date, route_str, departure_time, arrival_time)
+                deal_key = (normalized_program, deal_date, route_str, departure_time, arrival_time)
 
                 # Extract transfer info
                 transfer_info = route.get("transfer", [])
@@ -404,9 +397,15 @@ class PointsYeahScraper:
                             break # Assume one bonus is enough to highlight
 
                 if deal_key not in best_deals:
+                    origin_code, dest_code = route_str.split(" -> ")
                     best_deals[deal_key] = {
-                        "program": program_name, "route": route_str, "date": deal_date,
-                        "departure_time": departure_time, "arrival_time": arrival_time,
+                        "program": normalized_program, 
+                        "route": route_str, 
+                        "date": deal_date,
+                        "origin_airport_info": get_airport_info(origin_code),
+                        "destination_airport_info": get_airport_info(dest_code),
+                        "departure_time": departure_time, 
+                        "arrival_time": arrival_time,
                         "duration_minutes": route.get("duration", 0),
                         "direct": len(valid_segments) == 1,
                         "stops": stops,
