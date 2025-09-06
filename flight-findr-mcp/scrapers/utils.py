@@ -3,6 +3,8 @@ from typing import Optional, List, Dict, Any
 import asyncio
 import os
 from dotenv import load_dotenv
+from playwright.async_api import async_playwright
+import json
 from serpapi import GoogleSearch
 
 # Load environment variables from .env file
@@ -74,6 +76,7 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
 
             search = GoogleSearch(params)
             results = await asyncio.to_thread(search.get_dict)
+            print(f"SerpApi results for {origin}->{destination} on {date}: {results}")
             return results.get('best_flights', []) + results.get('other_flights', [])
 
         except Exception as e:
