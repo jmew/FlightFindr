@@ -43,11 +43,7 @@ async def startup_event():
 
 async def shutdown_event():
     """Closes the global scraper instance."""
-    global scraper_instance
-    if scraper_instance:
-        print("Closing PointsYeah scraper at server shutdown...")
-        await scraper_instance.close()
-        scraper_instance = None
+    await pointsyeah.close_scraper()
 
 async def main_async(args):
     """Runs startup, the server, and shutdown."""
