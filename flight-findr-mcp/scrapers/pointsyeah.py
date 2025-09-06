@@ -1,7 +1,4 @@
-import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from playwright.async_api import async_playwright, Page, Browser, Playwright
 import json
 import asyncio
@@ -23,7 +20,6 @@ class PointsYeahScraper:
         self.playwright: Playwright = playwright
         self.headless = headless
         self.browser: Optional[Browser] = None
-        self.page: Optional[Page] = None
         self._load_airport_data()
 
     @classmethod
@@ -46,7 +42,6 @@ class PointsYeahScraper:
                 "--disable-renderer-backgrounding",
             ]
         )
-        self.page = await self._create_new_page()
 
     async def close(self):
         """Closes the browser and stops Playwright."""
@@ -65,14 +60,41 @@ class PointsYeahScraper:
         """
         all_deals = []
         
-        search_tasks = [
-            self._scrape_one_search(
-                ",".join(search['origin_airports']),
-                ",".join(search['destination_airports']),
-                search['start_date'],
-                search['end_date']
-            ) for search in searches
-        ]
+        search_tasks = []
+        for search in searches:
+            origin = ",".join(search['origin_airports'])
+            destination = ",".join(search['destination_airports'])
+            start_date_str = search['start_date']
+            end_date_str = search['end_date']
+
+            start_date = datetime.fromisoformat(start_date_str)
+            end_date = datetime.fromisoformat(end_date_str)
+            
+            if (end_date - start_date).days > 4:
+                current_start_date = start_date
+                while current_start_date < end_date:
+                    current_end_date = current_start_date + timedelta(days=4)
+                    if current_end_date > end_date:
+                        current_end_date = end_date
+                    
+                    search_tasks.append(
+                        self._scrape_one_search(
+                            origin,
+                            destination,
+                            current_start_date.strftime('%Y-%m-%d'),
+                            current_end_date.strftime('%Y-%m-%d')
+                        )
+                    )
+                    current_start_date = current_end_date
+            else:
+                search_tasks.append(
+                    self._scrape_one_search(
+                        origin,
+                        destination,
+                        start_date_str,
+                        end_date_str
+                    )
+                )
         
         results = await asyncio.gather(*search_tasks, return_exceptions=True)
         
@@ -138,8 +160,7 @@ class PointsYeahScraper:
 
     async def _scrape_one_search(self, origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Performs a single flight search on PointsYeah and returns the processed deals."""
-        if not self.page:
-            raise Exception("Scraper not initialized properly.")
+        page = await self._create_new_page()
 
         print(f"Searching for flights from {origin} to {destination} between {start_date} and {end_date}...")
         best_deals: Dict[Any, Any] = {}
@@ -162,11 +183,11 @@ class PointsYeahScraper:
                     if not search_done_future.done():
                         search_done_future.set_exception(e)
 
-        self.page.on("response", handle_response)
+        page.on("response", handle_response)
 
         try:
             search_url = self._build_search_url(origin, destination, start_date, end_date)
-            points_task = asyncio.create_task(self.page.goto(search_url, timeout=90000, wait_until='domcontentloaded'))
+            points_task = asyncio.create_task(page.goto(search_url, timeout=90000, wait_until='domcontentloaded'))
             cash_task = asyncio.create_task(self._scrape_cash_prices(origin, destination, start_date, end_date))
 
             await asyncio.wait_for(search_done_future, timeout=120)
@@ -184,7 +205,8 @@ class PointsYeahScraper:
             print(f"An error occurred during scraping: {e}")
             return []
         finally:
-            self.page.remove_listener("response", handle_response)
+            page.remove_listener("response", handle_response)
+            await page.context.close()
 
         self._match_cash_prices(processed_deals_list, cash_prices_list)
 
@@ -405,7 +427,11 @@ async def main_test():
     scraper = None
     try:
         scraper = await PointsYeahScraper.create()
-        searches = [{"origin_airports": ["SEA"], "destination_airports": ["JFK"], "start_date": "2025-10-04", "end_date": "2025-10-04"}]
+        searches = [
+            {"origin_airports": ["SEA"], "destination_airports": ["LHR"], "start_date": "2025-10-04", "end_date": "2025-10-10"},
+            {"origin_airports": ["LHR"], "destination_airports": ["HKG"], "start_date": "2025-10-08", "end_date": "2025-10-14"},
+            {"origin_airports": ["HKG"], "destination_airports": ["SEA"], "start_date": "2025-10-10", "end_date": "2025-10-18"},
+        ]
         deals_json = await scraper.search_flights(searches)
         
         deals_data = json.loads(deals_json)
