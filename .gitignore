@@ -48,3 +48,6 @@ Thumbs.db
 # Environment-specific files
 .env.development
 .env.local
+
+# Data files
+flight-findr-mcp/deals.json
