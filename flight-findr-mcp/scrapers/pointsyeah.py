@@ -1,18 +1,22 @@
 import os
+import sys
 from playwright.async_api import async_playwright, Page, Browser, Playwright
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import json
 import asyncio
+import re
 from typing import List, Dict, Any, Optional
 from scrapers.utils import parse_time, fetch_cash_prices, PROGRAM_MAPPING
 from datetime import datetime, timedelta
-import airportsdata
+
 
 class PointsYeahScraper:
     """
     A class to manage scraping PointsYeah.com. It encapsulates the browser session,
     scraping logic, and data processing.
     """
-    _airports: Optional[Dict[str, Any]] = None
+    
 
     # --- Initialization and Lifecycle ---
 
@@ -20,7 +24,6 @@ class PointsYeahScraper:
         self.playwright: Playwright = playwright
         self.headless = headless
         self.browser: Optional[Browser] = None
-        self._load_airport_data()
 
     @classmethod
     async def create(cls, headless: bool = True):
@@ -100,7 +103,7 @@ class PointsYeahScraper:
         
         for result in results:
             if isinstance(result, Exception):
-                print(f"A search task failed: {result}")
+                print(f"A search task failed")
             else:
                 all_deals.extend(result)
 
@@ -131,7 +134,7 @@ class PointsYeahScraper:
                     if (
                         not existing_cabin_data
                         or not existing_cabin_data.get("points")
-                        or new_cabin_data["points"] < existing_cabin_data["points"]
+                        or new_cabin_data["points"] < existing_cabin_data.get("points")
                     ):
                         existing_deal[cabin] = new_cabin_data
                         if "source" in existing_deal and existing_deal["source"] != deal.get("source"):
@@ -259,8 +262,6 @@ class PointsYeahScraper:
                         "date": deal_date,
                         "departure_time": departure_time,
                         "arrival_time": arrival_time,
-                        "origin_airport_info": self._get_airport_info(origin_code),
-                        "destination_airport_info": self._get_airport_info(dest_code),
                         "duration_minutes": route.get("duration", 0),
                         "direct": len(valid_segments) == 1,
                         "stops": stops,
@@ -292,45 +293,78 @@ class PointsYeahScraper:
                     }
 
     def _match_cash_prices(self, deals: List[Dict[str, Any]], cash_prices_data: List[Dict[str, Any]]):
+        if not deals or not any(c.get('flights') for c in cash_prices_data):
+            return
+
         for deal in deals:
             for cabin_prices in cash_prices_data:
                 cabin = cabin_prices['cabin']
-                if not deal.get(cabin) or not deal[cabin].get('points'):
+                # Map fast-flight's 'premium-economy' to pointsyeah's 'premium'
+                deal_cabin_key = 'premium' if cabin == 'premium-economy' else cabin
+
+                if not deal.get(deal_cabin_key) or not deal[deal_cabin_key].get('points'):
                     continue
 
                 flights = cabin_prices.get('flights', [])
                 if not flights:
                     continue
                 
-                points = deal[cabin]['points']
+                points = deal[deal_cabin_key]['points']
+
                 
-                # Cheapest cash price
-                cheapest_flight = min(flights, key=lambda x: x['price'])
-                cheapest_price = cheapest_flight['price']
-                deal[cabin]['cheapest_cash_price'] = cheapest_price
-                deal[cabin]['cheapest_cpp'] = round((cheapest_price / points) * 100, 2) if points > 0 else 0
 
                 # Find exact match
                 award_departure_time = parse_time(deal.get('departure_time'))
-                award_flight_numbers = {fn.replace(' ', '') for fn in deal.get('flight_numbers', [])}
-                award_stops = set(deal.get('stops', []))
+                award_num_stops = len(deal.get('stops', []))
+                award_stops = deal.get('stops', [])
 
-                exact_match_flight = next((
-                    flight for flight in flights if flight.get('flights') and
-                    award_departure_time and (award_departure_time.hour == parse_time(flight['flights'][0]['departure_airport'].get('time')).hour and award_departure_time.minute == parse_time(flight['flights'][0]['departure_airport'].get('time')).minute) and
-                    award_flight_numbers == {f.get('flight_number', '').replace(' ', '') for f in flight.get('flights', [])} and
-                    award_stops == {l.get('id') for l in flight.get('layovers', [])}
-                ), None)
-            
+                exact_match_flight = None
+                if award_departure_time:
+                    for flight in flights:
+                        cash_departure_time = parse_time(flight.get('departure'))
+                        if not cash_departure_time:
+                            continue
+
+                        # 1. Match departure time (hour and minute)
+                        time_match = (award_departure_time.hour == cash_departure_time.hour and
+                                      award_departure_time.minute == cash_departure_time.minute)
+
+                        # 2. Match number of stops
+                        stops_match = (award_num_stops == flight.get('stops'))
+
+                        # 3. Match layover airports for multi-stop flights
+                        layover_match = False
+                        if not stops_match:
+                            pass # No need to check layovers if stop counts differ
+                        elif award_num_stops == 0:
+                            layover_match = True # Direct flights match
+                        else: # Flight with stops
+                            cash_layover_details = flight.get('layover_details')
+                            if cash_layover_details:
+                                # Extract 3-letter airport codes from the layover details string
+                                cash_stop_airports = re.findall(r'[A-Z]{3}', cash_layover_details)
+                                if set(award_stops) == set(cash_stop_airports):
+                                    layover_match = True
+
+                        if time_match and stops_match and layover_match:
+                            exact_match_flight = flight
+                            break
+                
                 if exact_match_flight:
-                    exact_price = exact_match_flight['price']
-                    deal[cabin]['exact_cash_price'] = exact_price
-                    deal[cabin]['exact_cpp'] = round((exact_price / points) * 100, 2) if points > 0 else 0
-                    deal[cabin]['cash_flight_details'] = exact_match_flight
+                    try:
+                        exact_price_str = exact_match_flight['price'].replace('$', '').replace(',', '')
+                        exact_price = float(exact_price_str)
+                        deal[deal_cabin_key]['exact_cash_price'] = exact_price
+                        deal[deal_cabin_key]['exact_cpp'] = round((exact_price / points) * 100, 2) if points > 0 else 0
+                        deal[deal_cabin_key]['cash_flight_details'] = exact_match_flight
+                    except (ValueError, TypeError, KeyError):
+                        deal[deal_cabin_key]['exact_cash_price'] = 'N/A'
+                        deal[deal_cabin_key]['exact_cpp'] = 'N/A'
+                        deal[deal_cabin_key]['cash_flight_details'] = None
                 else:
-                    deal[cabin]['exact_cash_price'] = 'N/A'
-                    deal[cabin]['exact_cpp'] = 'N/A'
-                    deal[cabin]['cash_flight_details'] = None
+                    deal[deal_cabin_key]['exact_cash_price'] = 'N/A'
+                    deal[deal_cabin_key]['exact_cpp'] = 'N/A'
+                    deal[deal_cabin_key]['cash_flight_details'] = None
 
     async def _scrape_cash_prices(self, origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         dates = []
@@ -340,7 +374,7 @@ class PointsYeahScraper:
             dates.append(current_date.strftime('%Y-%m-%d'))
             current_date += timedelta(days=1)
 
-        cash_price_tasks = [fetch_cash_prices(origin, destination, dates, cabin) for cabin in ['economy', 'premium', 'business', 'first']]
+        cash_price_tasks = [fetch_cash_prices(origin, destination, dates, cabin) for cabin in ['economy', 'premium-economy', 'business', 'first']]
         return await asyncio.gather(*cash_price_tasks)
 
     async def _create_new_page(self) -> Page:
@@ -402,18 +436,6 @@ class PointsYeahScraper:
         )
 
     # --- Class-level Helper/Utility Methods ---
-    @classmethod
-    def _load_airport_data(cls):
-        if cls._airports is None:
-            print("Loading airport data...")
-            cls._airports = airportsdata.load('IATA')
-            print("Airport data loaded.")
-
-    @classmethod
-    def _get_airport_info(cls, iata_code: str) -> Dict[str, Any]:
-        if not cls._airports:
-            return {"error": "Airport data not loaded"}
-        return cls._airports.get(iata_code, {"error": "Airport not found"})
 
     @staticmethod
     def _normalize_program_name(program_name: Optional[str]) -> Optional[str]:
@@ -428,9 +450,10 @@ async def main_test():
     try:
         scraper = await PointsYeahScraper.create()
         searches = [
-            {"origin_airports": ["SEA"], "destination_airports": ["LHR"], "start_date": "2025-10-04", "end_date": "2025-10-10"},
-            {"origin_airports": ["LHR"], "destination_airports": ["HKG"], "start_date": "2025-10-08", "end_date": "2025-10-14"},
-            {"origin_airports": ["HKG"], "destination_airports": ["SEA"], "start_date": "2025-10-10", "end_date": "2025-10-18"},
+            {"origin_airports": ["SEA"], "destination_airports": ["JFK"], "start_date": "2025-10-04", "end_date": "2025-10-04"}
+            # {"origin_airports": ["SEA"], "destination_airports": ["LHR"], "start_date": "2025-10-04", "end_date": "2025-10-10"},
+            # {"origin_airports": ["LHR"], "destination_airports": ["HKG"], "start_date": "2025-10-08", "end_date": "2025-10-14"},
+            # {"origin_airports": ["HKG"], "destination_airports": ["SEA"], "start_date": "2025-10-10", "end_date": "2025-10-18"},
         ]
         deals_json = await scraper.search_flights(searches)
         

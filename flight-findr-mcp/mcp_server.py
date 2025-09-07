@@ -6,14 +6,48 @@ from fastmcp.tools import Tool
 from scrapers.pointsyeah import PointsYeahScraper
 import json
 from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, ValidationError
+
+class FlightSearch(BaseModel):
+    origin_airports: List[str]
+    destination_airports: List[str]
+    start_date: str
+    end_date: str
 
 class FlightSearchMCP(FastMCP):
     def __init__(self):
         super().__init__()
         self.scraper: Optional[PointsYeahScraper] = None
+        
         self.add_tool(Tool.from_function(
             self.check_flight_points_prices,
-            description="Finds the best flight deals using points and cash from various sources.",
+            description="""Finds the best flight deals using points and cash from various sources. It accepts the following schema:
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "searches": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "origin_airports": {
+                                        "type": "array",
+                                        "items": {"type": "string"}
+                                    },
+                                    "destination_airports": {
+                                        "type": "array",
+                                        "items": {"type": "string"}
+                                    },
+                                    "start_date": {"type": "string"},
+                                    "end_date": {"type": "string"}
+                                },
+                                "required": ["origin_airports", "destination_airports", "start_date", "end_date"]
+                            }
+                        }
+                    },
+                    "required": ["searches"]
+                }
+            """,
         ))
 
     async def check_flight_points_prices(
@@ -25,7 +59,17 @@ class FlightSearchMCP(FastMCP):
         """
         if not self.scraper:
             return json.dumps({"error": "Scraper not initialized"})
-        return await self.scraper.search_flights(searches)
+        
+        if not isinstance(searches, list):
+             return json.dumps({"error": "Invalid input, 'searches' must be a list of search objects."})
+
+        try:
+            # Validate input with Pydantic
+            validated_searches = [FlightSearch(**search) for search in searches]
+            search_dicts = [search.dict() for search in validated_searches]
+            return await self.scraper.search_flights(search_dicts)
+        except ValidationError as e:
+            return json.dumps({"error": f"Invalid search object: {e}"})
 
 mcp_server = FlightSearchMCP()
 
