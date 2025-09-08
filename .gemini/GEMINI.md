@@ -27,41 +27,69 @@ To run the services locally for development:
 
 This project has specific behaviors and solutions that are critical to its operation.
 
-1.  **`deals.json` Data Structure**
-    *   The `deals.json` file contains the result of a flight search. The data is compressed to save space.
-    *   **`legend`**: A dictionary that maps short keys to full field names. This is used for decompression.
-    *   **`all_deals`**: A list of flight deal objects.
-    *   **`transfer_info` (`ti`)**: This is a list of short codes representing bank transfer partners. The full bank names are defined in the `legend`.
-    *   **`exact_cash_price` (`ecp`) and `exact_cpp` (`epp`)**: These fields are only included if a matching cash price was found.
-    *   **`layover_lengths` (`ll`)**: This is an array of numbers, each representing the duration of a layover in minutes. It replaces the old `cash_flight_details` object.
-    *   **Redundant Fields**: The `date` and `direct` fields have been removed to save space and are derived on the frontend.
+#### `deals.json` Data Structure
 
-### Key Learnings & Conventions
+The `deals.json` file, which is the output of the scraper, uses a hyper-compact data structure to save space. The data is an array of deals, where each deal is an array itself containing the segments, booking options, and total duration.
 
-This project has specific behaviors and solutions that are critical to its operation.
+-   **`legend`**: A dictionary that maps short keys to full field names. This is used for decompression on the frontend.
+-   **`deals`**: A list of flight deal arrays. Each array contains: `[segments, options, duration_minutes]`.
+-   **`segments`**: A list of flight segments, where each segment is an array of its properties (e.g., flight number, airports, times).
+-   **`options`**: A list of booking options for the given segments. Each option is an array containing the program, transfer partners, URL parameters, and available cabins.
 
-1.  **`deals.json` Data Structure**
-    *   The `deals.json` file contains the result of a flight search. The data is compressed to save space.
-    *   **`legend`**: A dictionary that maps short keys to full field names. This is used for decompression.
-    *   **`all_deals`**: A list of flight deal objects.
-    *   **`transfer_info` (`ti`)**: This is a list of short codes representing bank transfer partners. The full bank names are defined in the `legend`.
-    *   **`exact_cash_price` (`ecp`) and `exact_cpp` (`epp`)**: These fields are only included if a matching cash price was found.
-    *   **`layover_lengths` (`ll`)**: This is an array of numbers, each representing the duration of a layover in minutes. It replaces the old `cash_flight_details` object.
-    *   **Redundant Fields**: The `date` and `direct` fields have been removed to save space and are derived on the frontend.
+#### Frontend Architecture
 
-2.  **Scraper Search Completion:**
-    *   To detect when a flight search is complete, the scraper now waits for a specific network response containing `{"data": {"status": "done"}}`.
-    *   This is much more reliable than waiting for UI elements like progress bars. This logic is located in the `scrape()` method of `pointsyeah.py`.
+The `web-frontend` is a React application built with Vite. It follows a modern, modular, and feature-based architecture.
 
-3.  **Server Timeouts on Cloud Platforms:**
-    *   Long-running scraper requests (> 60 seconds) will cause timeouts on cloud platforms like Render or Cloud Run due to load balancer or server defaults.
-    *   The fix is two-fold and located in the `web-server`:
-        1.  The Node.js HTTP server timeout is explicitly increased to 5 minutes in `src/index.ts`.
-        2.  A keep-alive ping (SSE comment) is sent every 15 seconds during a tool call in `src/chatHandler.ts` to keep the browser-to-server connection from being closed by network infrastructure.
+*   **Component Structure:** Components in `src/components` are organized by feature (`chat`, `deals`, `common`, `home`). This makes the codebase easier to navigate and scale.
+    *   `common`: Contains shared, reusable components like `Logo` and `FullScreenModal`.
+    *   `chat`: Contains all components related to the chat interface.
+    *   `deals`: Contains components for displaying flight deals, including the filters and the table.
+    *   `home`: Contains components for the initial welcome screen.
 
-4.  **MCP Server Lifecycle:**
-    *   The `fastmcp` library does not appear to support the ASGI `lifespan` protocol for startup/shutdown events.
-    *   Therefore, the `mcp_server.py` manages the Playwright lifecycle manually within its `main_async` function, starting the browser before the server runs and using a `try...finally` block to guarantee it closes on shutdown.
+*   **Styling:** The project uses **CSS Modules** for component styling. Each component has a corresponding `.module.css` file, which scopes the styles locally to prevent conflicts. Global styles that are used across the application are defined in `src/App.css`.
+
+*   **State Management:** The primary application state for the chat interface is managed by the `useChat` custom hook (`src/hooks/useChat.ts`). This hook encapsulates the logic for handling messages, loading states, and user input.
+
+*   **Data Flow & API Interaction:**
+    *   All communication with the backend API is handled by functions in `src/services/api.ts`.
+    *   The raw, compressed flight deal data from the backend is processed and decompressed by functions in `src/utils/data-processing.ts`.
+    *   The `useChat` hook orchestrates this flow: it calls the API service, receives the raw data, uses the data processing utility to transform it into a usable format (`CompactFlightDeal[]`), and then updates the state to render the components.
+
+#### Web Server Architecture
+
+The `web-server` is a Node.js/Express application written in TypeScript. It follows a modular structure to separate concerns.
+
+*   **Code Organization:** The `src` directory is organized by feature:
+    *   `api`: Contains the route handlers for the Express application (`chatHandler.ts`, `multiCityHandler.ts`, etc.).
+    *   `services`: Contains services that are used by the handlers, such as `sessionManager.ts`.
+    *   `utils`: Contains utility functions, such as the `gemini-streamer.ts` for handling SSE.
+*   **Streaming Logic:** The logic for handling Server-Sent Events (SSE) and streaming responses from the Gemini API is encapsulated in the `streamGeminiResponse` function in `src/utils/gemini-streamer.ts`. This keeps the API handlers clean and focused on request/response logic.
+*   **Error Handling:** All API handlers have `try...catch` blocks to ensure that errors are caught and sent to the client in a consistent JSON format.
+
+#### Scraper (flight-findr-mcp) Architecture
+
+The `flight-findr-mcp` module is a Python-based scraper server that uses Playwright.
+
+*   **Single Scraper:** The project now exclusively uses the `PointsYeahScraper`. The `SeatsAeroScraper` has been removed to simplify the codebase.
+*   **Timezone-Aware Duration:** The flight duration is calculated in a timezone-aware manner in the backend using the `pytz` and `airportsdata` libraries. This ensures that the duration is accurate, regardless of the user's location.
+*   **Robust Program Identification:** The scraper now prioritizes the `code` field from the PointsYeah API to identify airline programs. This is more reliable than relying on string matching of program names.
+*   **Refactored Logic:** The `_process_deals` function in `pointsyeah.py` has been refactored into smaller, more focused helper functions (`_get_program_code`, `_calculate_duration`, `_extract_segments_data`, `_get_booking_option`) to improve readability and maintainability.
+
+
+#### Scraper Search Completion
+
+To detect when a flight search is complete, the scraper now waits for a specific network response containing `{"data": {"status": "done"}}`. This is much more reliable than waiting for UI elements like progress bars. This logic is located in the `scrape()` method of `pointsyeah.py`.
+
+#### Server Timeouts on Cloud Platforms
+
+Long-running scraper requests (> 60 seconds) will cause timeouts on cloud platforms like Render or Cloud Run due to load balancer or server defaults. The fix is two-fold and located in the `web-server`:
+
+1.  The Node.js HTTP server timeout is explicitly increased to 5 minutes in `src/index.ts`.
+2.  A keep-alive ping (SSE comment) is sent every 15 seconds during a tool call in `src/chatHandler.ts` to keep the browser-to-server connection from being closed by network infrastructure.
+
+#### MCP Server Lifecycle
+
+The `fastmcp` library does not appear to support the ASGI `lifespan` protocol for startup/shutdown events. Therefore, the `mcp_server.py` manages the Playwright lifecycle manually within its `main_async` function, starting the browser before the server runs and using a `try...finally` block to guarantee it closes on shutdown.
 
 ### **CRITICAL: Final Verification Steps**
 

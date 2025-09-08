@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { chatHandler } from './chatHandler.js';
-import { suggestionHandler } from './suggestionHandler.js';
-import { multiCityHandler } from './multiCityHandler.js';
+import { chatHandler } from './api/chatHandler.js';
+import { suggestionHandler } from './api/suggestionHandler.js';
+import { multiCityHandler } from './api/multiCityHandler.js';
 
 async function main() {
   const app = express();

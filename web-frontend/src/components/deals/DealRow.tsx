@@ -159,7 +159,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, showDate, hasCashPrice }) => {
                 {`${bestCabinDeal.exact_cpp}¢`} / pt
               </div>
               <div className={styles.fees}>
-                (Cash) ${bestCabinDeal.exact_cash_price} USD
+                ${bestCabinDeal.exact_cash_price} USD
               </div>
             </div>
           ) : (

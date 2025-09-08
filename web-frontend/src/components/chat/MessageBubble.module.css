@@ -22,6 +22,7 @@
   color: var(--gem-sys-color--on-surface);
   align-self: flex-start;
   max-width: 100%;
+  width: 100%;
 }
 
 .loadingMessage {

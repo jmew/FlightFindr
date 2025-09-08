@@ -32,6 +32,15 @@ body.empty-chat-mobile-lock {
   overflow: hidden;
 }
 
+.chat-conversation {
+  flex-grow: 1; /* Takes up all available space */
+  padding: 0 var(--gem-sys-spacing--l);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gem-sys-spacing--l);
+  overflow-y: auto; /* Allow this section to scroll */
+}
+
 /* Custom Scrollbar Styles */
 .chat-conversation::-webkit-scrollbar {
   width: 12px;

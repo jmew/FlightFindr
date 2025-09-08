@@ -228,7 +228,52 @@ class PointsYeahScraper:
             page.remove_listener("response", handle_response)
             await page.context.close()
 
-    def _process_deals(self, deals_chunk: List[Dict[str, Any]], best_deals: Dict[Any, Any]):
+    def _get_program_code(self, deal: Dict[str, Any]) -> Optional[str]:
+        program_code = deal.get("code")
+        if not program_code:
+            program_name = deal.get("program")
+            normalized_program = self._normalize_program_name(program_name)
+            if not normalized_program:
+                return None
+            program_code = self.PROGRAM_CODES.get(normalized_program)
+        return program_code
+
+    def _calculate_duration(self, valid_segments: List[Dict[str, Any]], route: Dict[str, Any]) -> int:
+        try:
+            dep_airport_code = valid_segments[0]['da']
+            arr_airport_code = valid_segments[-1]['aa']
+            dep_tz_str = self.airports[dep_airport_code]['tz']
+            arr_tz_str = self.airports[arr_airport_code]['tz']
+            dep_tz = pytz.timezone(dep_tz_str)
+            arr_tz = pytz.timezone(arr_tz_str)
+
+            dep_time_naive = datetime.fromisoformat(valid_segments[0]['dt'])
+            arr_time_naive = datetime.fromisoformat(valid_segments[-1]['at'])
+
+            dep_time_aware = dep_tz.localize(dep_time_naive)
+            arr_time_aware = arr_tz.localize(arr_time_naive)
+
+            return round((arr_time_aware - dep_time_aware).total_seconds() / 60)
+        except (KeyError, pytz.UnknownTimeZoneError):
+            return route.get("duration", 0)
+
+    def _extract_segments_data(self, valid_segments: List[Dict[str, Any]]) -> Tuple[Tuple[Any, ...], ...]:
+        segments_data = []
+        for i, s in enumerate(valid_segments):
+            layover_mins = 0
+            if i < len(valid_segments) - 1:
+                arr_time = datetime.fromisoformat(s.get('at'))
+                dep_time = datetime.fromisoformat(valid_segments[i+1].get('dt'))
+                layover_mins = round((dep_time - arr_time).total_seconds() / 60)
+            
+            segment_tuple = (
+                s.get('flight_number'), s.get('da'), s.get('aa'),
+                s.get('dt'), s.get('at'), layover_mins
+            )
+            segments_data.append(segment_tuple)
+        return tuple(segments_data)
+
+    def _get_booking_option(self, route: Dict[str, Any], program_code: str) -> Dict[str, Any]:
         bank_legend_short = {
             "Chase Ultimate Rewards": "chase",
             "American Exp Membership Rewards": "amex",
@@ -236,16 +281,26 @@ class PointsYeahScraper:
             "Citi Thank You Points": "citi",
             "Bilt": "bilt"
         }
+        transfer_info_raw = route.get("transfer") or []
+        transfer_partners = sorted([
+            bank_legend_short.get(t.get("bank")) for t in transfer_info_raw 
+            if t.get("bank") and bank_legend_short.get(t.get("bank"))
+        ])
+        booking_url = route.get("url", "")
+        url_params = booking_url.split('?')[1] if '?' in booking_url else ""
+        return {
+            "program": program_code,
+            "transfer_partners": transfer_partners,
+            "url_params": url_params,
+            "cabins": {}
+        }
+
+    def _process_deals(self, deals_chunk: List[Dict[str, Any]], best_deals: Dict[Any, Any]):
         for deal in deals_chunk:
             if not deal.get("routes"): continue
             
-            program_code = deal.get("code")
-            if not program_code:
-                program_name = deal.get("program")
-                normalized_program = self._normalize_program_name(program_name)
-                if not normalized_program: continue
-                program_code = self.PROGRAM_CODES.get(normalized_program)
-                if not program_code: continue
+            program_code = self._get_program_code(deal)
+            if not program_code: continue
 
             for route in deal["routes"]:
                 payment = route.get("payment", {})
@@ -255,39 +310,8 @@ class PointsYeahScraper:
                 valid_segments = [s for s in route.get("segments", []) if s.get("flight_number")]
                 if not valid_segments: continue
 
-                # Timezone-aware duration calculation
-                try:
-                    dep_airport_code = valid_segments[0]['da']
-                    arr_airport_code = valid_segments[-1]['aa']
-                    dep_tz_str = self.airports[dep_airport_code]['tz']
-                    arr_tz_str = self.airports[arr_airport_code]['tz']
-                    dep_tz = pytz.timezone(dep_tz_str)
-                    arr_tz = pytz.timezone(arr_tz_str)
-
-                    dep_time_naive = datetime.fromisoformat(valid_segments[0]['dt'])
-                    arr_time_naive = datetime.fromisoformat(valid_segments[-1]['at'])
-
-                    dep_time_aware = dep_tz.localize(dep_time_naive)
-                    arr_time_aware = arr_tz.localize(arr_time_naive)
-
-                    duration_minutes = round((arr_time_aware - dep_time_aware).total_seconds() / 60)
-                except (KeyError, pytz.UnknownTimeZoneError):
-                    duration_minutes = route.get("duration", 0)
-
-                segments_data = []
-                for i, s in enumerate(valid_segments):
-                    layover_mins = 0
-                    if i < len(valid_segments) - 1:
-                        arr_time = datetime.fromisoformat(s.get('at'))
-                        dep_time = datetime.fromisoformat(valid_segments[i+1].get('dt'))
-                        layover_mins = round((dep_time - arr_time).total_seconds() / 60)
-                    
-                    segment_tuple = (
-                        s.get('flight_number'), s.get('da'), s.get('aa'),
-                        s.get('dt'), s.get('at'), layover_mins
-                    )
-                    segments_data.append(segment_tuple)
-                segments_key = tuple(segments_data)
+                duration_minutes = self._calculate_duration(valid_segments, route)
+                segments_key = self._extract_segments_data(valid_segments)
 
                 if segments_key not in best_deals:
                     best_deals[segments_key] = (duration_minutes, {})
@@ -296,19 +320,7 @@ class PointsYeahScraper:
                 option_data = options_dict.get(program_code)
 
                 if not option_data:
-                    transfer_info_raw = route.get("transfer") or []
-                    transfer_partners = sorted([
-                        bank_legend_short.get(t.get("bank")) for t in transfer_info_raw 
-                        if t.get("bank") and bank_legend_short.get(t.get("bank"))
-                    ])
-                    booking_url = route.get("url", "")
-                    url_params = booking_url.split('?')[1] if '?' in booking_url else ""
-                    option_data = {
-                        "program": program_code,
-                        "transfer_partners": transfer_partners,
-                        "url_params": url_params,
-                        "cabins": {}
-                    }
+                    option_data = self._get_booking_option(route, program_code)
                     options_dict[program_code] = option_data
 
                 cabin_code = "Y"
@@ -449,7 +461,7 @@ class PointsYeahScraper:
             f"https://www.pointsyeah.com/search?cabins=Economy%2CPremium+Economy%2CBusiness%2CFirst"
             f"&cabin=Economy"
             f"&banks=Amex%2CCapital+One%2CChase"
-            f"&airlineProgram=AR%2CAM%2CAC%2CKL%2CAS%2CAV%2CDL%2CEK%2CEY%2CAY%2CIB%2CB6%2CLH%2CQF%2CSK%2CSQ%2CNK%2CTP%2CTK%2CUA%2CVS"
+            f"&airlineProgram=AR%2CAM%2CAC%2CKL%2CAS%2CAV%2CDL%2CEK%2CEY%2CAY%2CIB%2CB6%2CLH%2CQF%2CSK%2CSQ%2CNK%2CTP%2CTK%2CUA%2CVS%2CAA"
             f"&tripType=1"
             f"&adults=1"
             f"&children=0"

@@ -17,7 +17,7 @@
 
 .dealRow {
   display: grid;
-  grid-template-columns: 0.5fr 2fr 1fr 1fr 1.25fr 0.5fr; /* 6 columns */
+  grid-template-columns: 0.5fr 2fr 1fr 1fr 1.25fr 0.1fr; /* 6 columns */
   align-items: center;
   padding: 16px;
   cursor: pointer;
