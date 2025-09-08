@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { FlightDeal } from '../types';
-import type { Message, Tool } from '../types';
+import type { CompactFlightDeal, Message, Tool, BookingOption } from '../types';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 function parseMultiCityMessage(message: string) {
@@ -26,21 +25,6 @@ function parseMultiCityMessage(message: string) {
 
   return { startLocation, endLocation, intermediateStops, startDate, endDate, maxLength, constraints, flexible };
 }
-
-const decompressObject = (obj: any, reverseLegend: { [key: string]: string }): any => {
-  if (Array.isArray(obj)) {
-    return obj.map(item => decompressObject(item, reverseLegend));
-  }
-  if (typeof obj !== 'object' || obj === null) {
-    return obj;
-  }
-  const decompressed: { [key: string]: any } = {};
-  for (const shortKey in obj) {
-    const longKey = reverseLegend[shortKey] || shortKey;
-    decompressed[longKey] = decompressObject(obj[shortKey], reverseLegend);
-  }
-  return decompressed;
-};
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -168,7 +152,7 @@ export function useChat() {
           setMessages((prev) =>
             prev.map((msg) => {
               if (msg.tools && msg.tools.some((t: Tool) => t.callId === data.callId)) {
-                let newFlightData = msg.flightData || [];
+                let newFlightData: CompactFlightDeal[] = msg.flightData || [];
                 const updatedTools = msg.tools.map((tool: Tool) => {
                   if (tool.callId === data.callId) {
                     const updatedTool = {
@@ -178,35 +162,87 @@ export function useChat() {
                     };
                     if (tool.name === 'check_flight_points_prices') {
                       try {
-                        console.log("Raw tool result:", data.result);
                         if (typeof data.result === 'string' && data.result.trim().startsWith('{')) {
                           const parsedResult = JSON.parse(data.result);
-                          console.log("Parsed result:", parsedResult);
-                          if (parsedResult.all_deals && parsedResult.legend) {
-                            const reverseLegend = Object.fromEntries(
-                              Object.entries(parsedResult.legend).map(([k, v]) => [v, k])
-                            );
-                            const decompressedDeals = decompressObject(parsedResult.all_deals, reverseLegend);
+                          if (parsedResult.deals && parsedResult.legend) {
+                            const { legend, deals } = parsedResult;
+                            const { cabin_codes, programs, banks, booking_urls } = legend;
 
-                            // Post-process to decompress transfer_info
-                            decompressedDeals.forEach((deal: any) => {
-                                if (deal.transfer_info && Array.isArray(deal.transfer_info)) {
-                                    deal.transfer_info = deal.transfer_info.map(
-                                        (bankCode: string) => reverseLegend[bankCode] || bankCode
-                                    );
+                            const decompressedDeals: CompactFlightDeal[] = deals.map((deal: any, index: number) => {
+                                const [segments, options, duration_minutes] = deal;
+
+                                const firstSegment = segments[0];
+                                const lastSegment = segments[segments.length - 1];
+                                const departure_time = firstSegment[3];
+                                const arrival_time = lastSegment[4];
+                                const route = `${firstSegment[1]} -> ${lastSegment[2]}`;
+                                
+                                const stops = segments.slice(0, -1).map((seg: any) => seg[2]);
+                                const airlines = [...new Set(segments.map((seg: any) => seg[0].substring(0, 2)))];
+                                const flight_numbers = segments.map((seg: any) => seg[0]);
+                                const layover_lengths = segments.slice(0, -1).map((seg: any) => seg[5]);
+                                
+                                let overnight_layover = false;
+                                for (let i = 0; i < segments.length - 1; i++) {
+                                    const arr_time = new Date(segments[i][4]);
+                                    const dep_time = new Date(segments[i+1][3]);
+                                    if (arr_time.getDate() !== dep_time.getDate()) {
+                                        overnight_layover = true;
+                                        break;
+                                    }
                                 }
+
+                                const bookingOptions: BookingOption[] = options.map((opt: any) => {
+                                    const [program_code, transfer_partner_codes, url_params, cabin_deals] = opt;
+                                    
+                                    const program = programs[program_code] || program_code;
+                                    const booking_url = booking_urls[program_code]?.replace('{params}', url_params) || '';
+                                    const transfer_info = transfer_partner_codes.map((code: string) => banks[code] || code);
+
+                                    const bookingOption: BookingOption = {
+                                        program,
+                                        booking_url,
+                                        transfer_info,
+                                    };
+
+                                    for (const cabin_code in cabin_deals) {
+                                        const [points, tax, cash_price, cpp] = cabin_deals[cabin_code];
+                                        const cabin_name_full = cabin_codes[cabin_code] || cabin_code;
+                                        const cabin_name = cabin_name_full.toLowerCase().replace(' ', '');
+                                        
+                                        let cabin_key: 'economy' | 'premium' | 'business' | 'first' = 'economy';
+                                        if (cabin_name.startsWith('premium')) cabin_key = 'premium';
+                                        else if (cabin_name.startsWith('business')) cabin_key = 'business';
+                                        else if (cabin_name.startsWith('first')) cabin_key = 'first';
+
+                                        bookingOption[cabin_key] = {
+                                            points,
+                                            fees: `${tax}`,
+                                            bonus: null,
+                                            exact_cash_price: cash_price,
+                                            exact_cpp: cpp,
+                                        };
+                                    }
+                                    return bookingOption;
+                                });
+
+                                return {
+                                    id: `${route}-${departure_time}-${index}`,
+                                    route,
+                                    departure_time,
+                                    arrival_time,
+                                    duration_minutes,
+                                    stops,
+                                    airlines,
+                                    overnight_layover,
+                                    layover_duration: layover_lengths.reduce((a: number, b: number) => a + b, 0),
+                                    flight_numbers,
+                                    layover_lengths,
+                                    options: bookingOptions,
+                                };
                             });
 
-                            console.log("Decompressed deals:", decompressedDeals);
-
-                            const parsedFlightData: FlightDeal[] = decompressedDeals.map((deal: any, index: number) => ({
-                              ...deal,
-                              id: `${deal.route}-${deal.departure_time}-${index}`,
-                              flight_numbers: deal.flight_numbers || [],
-                              stops: deal.stops || [],
-                            }));
-                            console.log("Final parsed flight data:", parsedFlightData);
-                            newFlightData = [...newFlightData, ...parsedFlightData];
+                            newFlightData = [...newFlightData, ...decompressedDeals];
                           }
                         } else if (data.result) {
                           console.warn('Tool result is not a valid JSON object:', data.result);

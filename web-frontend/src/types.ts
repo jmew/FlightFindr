@@ -10,13 +10,13 @@ export interface Message {
   sender: 'user' | 'bot';
   text: string;
   tools?: Tool[];
-  flightData?: FlightDeal[];
+  flightData?: CompactFlightDeal[];
 }
 
-interface CabinDeal {
+export interface CabinDeal {
   points: number;
   fees: string;
-  bonus: {
+  bonus?: {
     bank: string;
     percentage: number;
     end_date: string;
@@ -25,9 +25,18 @@ interface CabinDeal {
   exact_cpp?: number | string;
 }
 
-export interface FlightDeal {
-  id: string;
+export interface BookingOption {
   program: string;
+  booking_url: string;
+  transfer_info: string[];
+  economy?: CabinDeal;
+  premium?: CabinDeal;
+  business?: CabinDeal;
+  first?: CabinDeal;
+}
+
+export interface CompactFlightDeal {
+  id: string;
   route: string;
   departure_time: string;
   arrival_time: string;
@@ -38,15 +47,5 @@ export interface FlightDeal {
   overnight_layover?: boolean;
   layover_duration?: number;
   layover_lengths?: number[];
-  booking_url: string;
-  transfer_info: string[];
-
-  economy?: CabinDeal;
-  premium?: CabinDeal;
-  business?: CabinDeal;
-  first?: CabinDeal;
-
-  // For frontend state management
-  displayCabin: 'economy' | 'premium' | 'business' | 'first';
-  isBestDeal?: boolean;
+  options: BookingOption[];
 }

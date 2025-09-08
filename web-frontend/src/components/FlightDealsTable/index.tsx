@@ -7,27 +7,47 @@ import {
 } from 'react-icons/fi';
 import DealFilters from '../DealFilters';
 import Logo from '../Logo';
-import type { FlightDeal } from '../../types';
+import type { CompactFlightDeal, BookingOption, CabinDeal } from '../../types';
 import { formatDuration, formatFlightTimes } from '../../utils/formatters';
 import { getAirlineNameByCode } from '../../utils/airlineMappings';
 
 interface DealRowProps {
-  deal: FlightDeal;
-  cabin: 'economy' | 'premium' | 'business' | 'first';
+  deal: CompactFlightDeal;
   showDate: boolean;
   hasCashPrice: boolean;
 }
 
-const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }) => {
+const DealRow: React.FC<DealRowProps> = ({ deal, showDate, hasCashPrice }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const cabinData = deal[cabin];
 
-  if (!cabinData) return null;
+  const bestDeal = useMemo(() => {
+    let bestCabinDeal: CabinDeal | undefined;
+    let bestOption: BookingOption | undefined;
 
-  const { points, fees, bonus } = cabinData;
-  const { booking_url, transfer_info } = deal;
+    deal.options.forEach(option => {
+      ['economy', 'premium', 'business', 'first'].forEach(cabin => {
+        const cabinKey = cabin as keyof BookingOption;
+        const cabinData = option[cabinKey] as CabinDeal | undefined;
+        if (cabinData) {
+          if (!bestCabinDeal || cabinData.points < bestCabinDeal.points) {
+            bestCabinDeal = cabinData;
+            bestOption = option;
+          }
+        }
+      });
+    });
 
-  const transferPartners = deal.transfer_info || [];
+    return { bestCabinDeal, bestOption };
+  }, [deal]);
+
+  if (!bestDeal.bestCabinDeal || !bestDeal.bestOption) {
+    return null;
+  }
+
+  const { bestCabinDeal, bestOption } = bestDeal;
+  const { points, fees, bonus } = bestCabinDeal;
+  const { transfer_info, program } = bestOption;
+
   const [origin, destination] = deal.route.split(' -> ');
   const { departureTime, arrivalTime, isNextDay } = formatFlightTimes(
     deal.departure_time,
@@ -119,10 +139,10 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
                 <FiStar />
               </span>
             )}
-            {deal.program.split(' ')[0].toLowerCase() !== airlineName.split(' ')[0].toLowerCase() && (
+            {program.split(' ')[0].toLowerCase() !== airlineName.split(' ')[0].toLowerCase() && (
               <div className="tooltip-container">
                 <span style={{ color: 'var(--gem-sys-color--primary)' }}>*</span>
-                <span className="tooltip-text">Book with {deal.program}</span>
+                <span className="tooltip-text">Book with {program}</span>
               </div>
             )}
             {points.toLocaleString()}<span style={{ fontSize: '0.5em' }}> pts</span>
@@ -130,16 +150,16 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
           <div className="fees">+ {fees} USD</div>
         </div>
         {hasCashPrice &&
-          (cabinData.exact_cpp && cabinData.exact_cpp !== 'N/A' ? (
+          (bestCabinDeal.exact_cpp && bestCabinDeal.exact_cpp !== 'N/A' ? (
             <div className="section cpp-info">
               <div
                 className="points-value"
-                style={{ color: getCppColor(cabinData.exact_cpp) }}
+                style={{ color: getCppColor(bestCabinDeal.exact_cpp) }}
               >
-                {`${cabinData.exact_cpp}¢`} / pt
+                {`${bestCabinDeal.exact_cpp}¢`} / pt
               </div>
               <div className="fees">
-                (Cash) ${cabinData.exact_cash_price} USD
+                (Cash) ${bestCabinDeal.exact_cash_price} USD
               </div>
             </div>
           ) : (
@@ -154,27 +174,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
           <div className="detail-item">
             <strong>Flight Numbers:</strong> {deal.flight_numbers.join(', ')}
           </div>
-          {bonus && (
-            <div className="detail-item transfer-bonus-details">
-              <strong>✨ {bonus.percentage}% Transfer Bonus</strong> from{' '}
-              {bonus.bank} (ends{' '}
-              {new Date(Number(bonus.end_date) * 1000).toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-              )
-            </div>
-          )}
-          <div className="detail-item transfers">
-            <strong>Transfer From:</strong>
-            <div className="transfer-partners">
-                {transferPartners.map((partner: string) => (
-                  <Logo key={partner} type="bank" name={partner} />
-                ))}
-              </div>
-            </div>
-            {deal.layover_lengths && deal.layover_lengths.length > 0 && (
+          {deal.layover_lengths && deal.layover_lengths.length > 0 && (
               <div className="detail-item">
                 <strong>Layovers:</strong>
                 <span>
@@ -184,14 +184,47 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
                 </span>
               </div>
             )}
-            <a
-            href={booking_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="deal-card-book-btn"
-          >
-            Book on {deal.program}
-          </a>
+          <div className="detail-item transfers">
+            <strong>Transfer From:</strong>
+            <div className="transfer-partners">
+                {transfer_info.map((partner: string) => (
+                  <Logo key={partner} type="bank" name={partner} />
+                ))}
+              </div>
+            </div>
+            <div className="booking-options-container">
+              {deal.options.map(option => (
+                <div key={option.program} className="booking-option-card">
+                  <div className="booking-option-header">
+                    <span className="booking-option-program">Book on {option.program}</span>
+                    <div className="transfer-partners-small">
+                      {option.transfer_info.map(p => <Logo key={p} type="bank" name={p} />)}
+                    </div>
+                  </div>
+                  <div className="cabin-options">
+                    {['economy', 'premium', 'business', 'first'].map(cabin => {
+                      const cabinData = option[cabin as keyof BookingOption] as CabinDeal | undefined;
+                      if (!cabinData) return null;
+                      return (
+                        <div key={cabin} className="cabin-option">
+                          <span className="cabin-name">{cabin.charAt(0).toUpperCase() + cabin.slice(1)}</span>
+                          <span className="cabin-points">{cabinData.points.toLocaleString()} pts</span>
+                          <span className="cabin-fees">+ {cabinData.fees}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <a
+                    href={option.booking_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="deal-card-book-btn"
+                  >
+                    Go to Booking
+                  </a>
+                </div>
+              ))}
+            </div>
         </div>
       )}
     </div>
@@ -199,7 +232,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
 };
 
 interface FlightDealsTableProps {
-  deals: FlightDeal[];
+  deals: CompactFlightDeal[];
 }
 
 interface ActiveFilters {
@@ -209,7 +242,7 @@ interface ActiveFilters {
   maxPoints: number | null;
 }
 
-const calculateTopFlightScore = (deal: FlightDeal, cheapestPrice: number, shortestDuration: number) => {
+const calculateTopFlightScore = (deal: CompactFlightDeal, cheapestPrice: number, shortestDuration: number) => {
   const weights = {
     price: 40,
     duration: 30,
@@ -217,10 +250,17 @@ const calculateTopFlightScore = (deal: FlightDeal, cheapestPrice: number, shorte
     time: 10,
   };
 
-  const cabinData = deal[deal.displayCabin as keyof FlightDeal] as any;
-  if (!cabinData) return Infinity;
+  const bestOption = deal.options.reduce((best, option) => {
+    const optionPoints = Math.min(...Object.values(option).filter(c => c && typeof c === 'object' && 'points' in c).map(c => (c as CabinDeal).points));
+    if (optionPoints < best.points) {
+      return { points: optionPoints };
+    }
+    return best;
+  }, { points: Infinity });
 
-  const priceScore = (cabinData.points || 0) / cheapestPrice;
+  if (bestOption.points === Infinity) return Infinity;
+
+  const priceScore = bestOption.points / cheapestPrice;
   const durationScore = deal.duration_minutes / shortestDuration;
 
   let stopsPenalty = 0;
@@ -288,8 +328,6 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
     return !deals.every(deal => new Date(deal.departure_time).toDateString() === firstDate);
   }, [deals]);
 
-  
-
   const { availablePrograms, minPoints, maxPoints, shortestDuration, availableCabins, availableStops } = useMemo(() => {
     const programs = new Set<string>();
     const cabins = new Set<string>();
@@ -299,18 +337,20 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
     let shortest = Infinity;
 
     deals.forEach(deal => {
-      programs.add(deal.program);
       if (deal.duration_minutes < shortest) {
         shortest = deal.duration_minutes;
       }
       stops.add((deal.stops || []).length);
-      ['economy', 'premium', 'business', 'first'].forEach(cabin => {
-        const cabinData = deal[cabin as keyof FlightDeal] as any;
-        if (cabinData && cabinData.points) {
-          cabins.add(cabin.charAt(0).toUpperCase() + cabin.slice(1));
-          if (cabinData.points < min) min = cabinData.points;
-          if (cabinData.points > max) max = cabinData.points;
-        }
+      deal.options.forEach(option => {
+        programs.add(option.program);
+        ['economy', 'premium', 'business', 'first'].forEach(cabin => {
+          const cabinData = option[cabin as keyof BookingOption] as CabinDeal | undefined;
+          if (cabinData && cabinData.points) {
+            cabins.add(cabin.charAt(0).toUpperCase() + cabin.slice(1));
+            if (cabinData.points < min) min = cabinData.points;
+            if (cabinData.points > max) max = cabinData.points;
+          }
+        });
       });
     });
 
@@ -329,124 +369,110 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
     };
   }, [deals]);
 
-  const dealsWithCabin = useMemo(() => {
-    const newDeals: (FlightDeal & { displayCabin: string })[] = [];
-    deals.forEach(deal => {
-      ['economy', 'premium', 'business', 'first'].forEach(cabin => {
-        const cabinKey = cabin as keyof FlightDeal;
-        if (deal[cabinKey]) {
-          newDeals.push({
-            ...deal,
-            id: `${deal.id}-${cabin}`,
-            displayCabin: cabin,
-          });
-        }
-      });
-    });
-    return newDeals;
-  }, [deals]);
-
   const filteredDeals = useMemo(() => {
-    return dealsWithCabin.filter((deal) => {
+    return deals.filter((deal) => {
       const { cabinClasses, airlinePrograms, stops, maxPoints } = filters;
-      
-      if (
-        cabinClasses.length > 0 &&
-        !cabinClasses.some((c) => deal.displayCabin.startsWith(c.toLowerCase()))
-      ) {
-        return false;
-      }
-      
-      if (
-        airlinePrograms.length > 0 &&
-        !airlinePrograms.includes(deal.program)
-      ) {
-        return false;
-      }
-      
+
+      const hasMatchingOption = deal.options.some(option => {
+        if (airlinePrograms.length > 0 && !airlinePrograms.includes(option.program)) {
+          return false;
+        }
+
+        const hasMatchingCabin = ['economy', 'premium', 'business', 'first'].some(cabin => {
+          const cabinKey = cabin as keyof BookingOption;
+          const cabinData = option[cabinKey] as CabinDeal | undefined;
+          if (!cabinData) return false;
+
+          if (cabinClasses.length > 0 && !cabinClasses.some(c => cabin.startsWith(c.toLowerCase()))) {
+            return false;
+          }
+          if (maxPoints !== null && cabinData.points > maxPoints) {
+            return false;
+          }
+          return true;
+        });
+
+        return hasMatchingCabin;
+      });
+
+      if (!hasMatchingOption) return false;
+
       if (stops.length > 0) {
         const stopCount = (deal.stops || []).length;
-        
         const stopConditions = {
           'Nonstop': stopCount === 0,
           '1 Stop': stopCount === 1,
           '2+ Stops': stopCount >= 2,
         };
-
         const matches = stops.some(stop => stopConditions[stop as keyof typeof stopConditions]);
-
-        if (!matches) {
-          return false;
-        }
-      }
-
-      if (maxPoints !== null) {
-        const cabinData = deal[deal.displayCabin as keyof FlightDeal] as any;
-        if (!cabinData || cabinData.points > maxPoints) {
-          return false;
-        }
+        if (!matches) return false;
       }
 
       return true;
     });
-  }, [dealsWithCabin, filters]);
+  }, [deals, filters]);
 
   const sortedDeals = useMemo(() => {
+    const getDealSortValue = (deal: CompactFlightDeal, cabinFilter: string[]) => {
+      let bestPoints = Infinity;
+      let bestFees = Infinity;
+
+      deal.options.forEach(option => {
+        ['economy', 'premium', 'business', 'first'].forEach(cabin => {
+          if (cabinFilter.length > 0 && !cabinFilter.some(c => cabin.startsWith(c.toLowerCase()))) return;
+
+          const cabinData = option[cabin as keyof BookingOption] as CabinDeal | undefined;
+          if (cabinData) {
+            if (cabinData.points < bestPoints) {
+              bestPoints = cabinData.points;
+            }
+            const feeValue = parseFloat(cabinData.fees.replace(/[^\d.]/g, ''));
+            if (feeValue < bestFees) {
+              bestFees = feeValue;
+            }
+          }
+        });
+      });
+
+      return { points: bestPoints, fees: bestFees };
+    };
+
     const dealsWithScores = filteredDeals.map((deal) => ({
       ...deal,
-      score: calculateTopFlightScore(
-        deal as FlightDeal,
-        minPoints,
-        shortestDuration,
-      ),
+      score: calculateTopFlightScore(deal, minPoints, shortestDuration),
+      sortValues: getDealSortValue(deal, filters.cabinClasses),
     }));
 
     if (sortBy === 'top') {
-      const sortedByScore = [...dealsWithScores].sort((a, b) => a.score - b.score);
-      if (sortedByScore.length > 20) {
-        const percentileIndex = Math.floor(sortedByScore.length * 0.65);
-        return sortedByScore.slice(0, percentileIndex + 1);
-      }
-      return sortedByScore;
+      return [...dealsWithScores].sort((a, b) => a.score - b.score);
     }
 
     return [...dealsWithScores].sort((a, b) => {
-      const aCabin = a.displayCabin as
-        | 'economy'
-        | 'premium'
-        | 'business'
-        | 'first';
-      const bCabin = b.displayCabin as
-        | 'economy'
-        | 'premium'
-        | 'business'
-        | 'first';
-
       if (sortBy === 'points') {
-        const aData = a[aCabin];
-        const bData = b[bCabin];
-        return (aData?.points || Infinity) - (bData?.points || Infinity);
+        const pointsA = a.sortValues.points;
+        const pointsB = b.sortValues.points;
+        if (pointsA !== pointsB) {
+          return pointsA - pointsB;
+        }
+        const stopsA = a.stops?.length || 0;
+        const stopsB = b.stops?.length || 0;
+        return stopsA - stopsB;
       }
-
       if (sortBy === 'fees') {
-        const aData = a[aCabin];
-        const bData = b[bCabin];
-        const feeA = aData
-          ? parseFloat(aData.fees.replace(/[^\d.]/g, ''))
-          : Infinity;
-        const feeB = bData
-          ? parseFloat(bData.fees.replace(/[^\d.]/g, ''))
-          : Infinity;
-        return feeA - feeB;
+        return a.sortValues.fees - b.sortValues.fees;
       }
       return 0;
     });
-  }, [filteredDeals, sortBy, minPoints, shortestDuration]);
+  }, [filteredDeals, sortBy, minPoints, shortestDuration, filters.cabinClasses]);
 
   const hasAnyCashPrice = useMemo(() => {
     return sortedDeals.some(deal => {
-        const cabinData = deal[deal.displayCabin as keyof FlightDeal] as any;
-        return cabinData && cabinData.exact_cpp && cabinData.exact_cpp !== 'N/A';
+      return deal.options.some(option => {
+        return ['economy', 'premium', 'business', 'first'].some(cabin => {
+          const cabinData = option[cabin as keyof BookingOption] as CabinDeal | undefined;
+          return cabinData && cabinData.exact_cpp && cabinData.exact_cpp !== 'N/A';
+        });
+      });
     });
   }, [sortedDeals]);
 
@@ -469,14 +495,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
         {sortedDeals.map((deal) => (
           <React.Fragment key={deal.id}>
             <DealRow
-              deal={deal as FlightDeal}
-              cabin={
-                deal.displayCabin as
-                  | 'economy'
-                  | 'premium'
-                  | 'business'
-                  | 'first'
-              }
+              deal={deal}
               showDate={showDates}
               hasCashPrice={hasAnyCashPrice}
             />

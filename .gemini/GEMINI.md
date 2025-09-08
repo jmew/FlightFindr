@@ -101,3 +101,6 @@ When committing changes, especially with multi-line commit messages, it's best t
         command="rm .git/commit_msg.txt"
     )
     ```
+
+### Last Notes
+Do not make any changes to the async main_test() function in pointsyeah.py unless instructed to do so

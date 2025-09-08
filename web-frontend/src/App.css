@@ -888,3 +888,60 @@ body.empty-chat-mobile-lock {
   font-size: 8px;
   color: rgb(232, 234, 237);
 }
+
+.booking-options-container {
+  grid-column: 1 / -1; /* Span full width */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.booking-option-card {
+  background-color: var(--gem-sys-color--surface);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.booking-option-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+  color: var(--gem-sys-color--on-surface);
+}
+
+.transfer-partners-small {
+  display: flex;
+  gap: 6px;
+}
+
+.cabin-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.cabin-option {
+  display: flex;
+  justify-content: space-between;
+  background-color: var(--gem-sys-color--surface-container);
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.cabin-name {
+  font-weight: 500;
+}
+
+.cabin-points {
+  color: var(--gem-sys-color--primary);
+}
+
+.cabin-fees {
+  color: var(--gem-sys-color--on-surface-variant);
+}
