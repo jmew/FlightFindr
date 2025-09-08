@@ -16,7 +16,6 @@ export interface Message {
 interface CabinDeal {
   points: number;
   fees: string;
-  seats: number;
   bonus: {
     bank: string;
     percentage: number;
@@ -30,26 +29,17 @@ export interface FlightDeal {
   id: string;
   program: string;
   route: string;
-  date: string;
   departure_time: string;
   arrival_time: string;
   duration_minutes: number;
-  direct: boolean;
   flight_numbers: string[];
   stops?: string[];
   airlines?: string[];
   overnight_layover?: boolean;
   layover_duration?: number;
+  layover_lengths?: number[];
   booking_url: string;
-  transfer_info: {
-    bank: string;
-    actual_points: number;
-    points: number;
-    bonus_percentage: number;
-    bonus_end_date: number | null;
-    code: string;
-  }[];
-  cash_flight_details?: any;
+  transfer_info: string[];
 
   economy?: CabinDeal;
   premium?: CabinDeal;

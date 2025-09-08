@@ -7,28 +7,9 @@ import {
 } from 'react-icons/fi';
 import DealFilters from '../DealFilters';
 import Logo from '../Logo';
-import type { FlightDeal, SlimCashFlightDetails } from '../../types';
+import type { FlightDeal } from '../../types';
 import { formatDuration, formatFlightTimes } from '../../utils/formatters';
 import { getAirlineNameByCode } from '../../utils/airlineMappings';
-
-const CashFlightDetails = ({ details }: { details: SlimCashFlightDetails }) => {
-  if (!details) return null;
-
-  return (
-    <div className="cash-flight-details" style={{ marginTop: '16px' }}>
-        <div className="segment-details" style={{ marginBottom: '12px' }}>
-            <p style={{ margin: '4px 0 0 10px', color: 'var(--gem-sys-color--on-surface-variant)'}}>
-              {details.name} {details.flight_number}
-            </p>
-            {details.layover_details && (
-              <div className="layover-details" style={{ marginLeft: '10px', padding: '8px', color: 'var(--gem-sys-color--on-surface-variant)'}}>
-                Layover: {details.layover_details}
-              </div>
-            )}
-        </div>
-    </div>
-  );
-};
 
 interface DealRowProps {
   deal: FlightDeal;
@@ -44,15 +25,16 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
   if (!cabinData) return null;
 
   const { points, fees, bonus } = cabinData;
-  const { booking_url, transfer_info, cash_flight_details } = deal;
+  const { booking_url, transfer_info } = deal;
 
-  const transferPartners =
-    transfer_info?.map((t: { bank: string }) => t.bank) || [];
+  const transferPartners = deal.transfer_info || [];
   const [origin, destination] = deal.route.split(' -> ');
   const { departureTime, arrivalTime, isNextDay } = formatFlightTimes(
     deal.departure_time,
     deal.arrival_time,
   );
+
+  const isDirect = (deal.stops || []).length === 0;
 
   const gridStyle = {
     gridTemplateColumns: hasCashPrice
@@ -71,9 +53,9 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
   const displayName = getDisplayName(airlineName);
 
   const routeString =
-    deal.direct
+    isDirect
       ? `${origin} → ${destination}`
-      : `${origin} → ${deal.stops.join(' → ')} → ${destination}`;
+      : `${origin} → ${(deal.stops || []).join(' → ')} → ${destination}`;
 
   const getCppColor = (cpp: number | string) => {
     if (typeof cpp === 'string') return 'inherit';
@@ -100,7 +82,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
         <div className="section time-info">
           {showDate && (
             <div style={{ fontSize: '0.8em', fontFamily: 'roboto', color: 'var(--gem-sys-color--on-surface-variant)' }}>
-              {new Date(deal.date.replace(/-/g, '/')).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {new Date(deal.departure_time.replace(/-/g, '/')).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </div>
           )}
           <span className="time">
@@ -114,10 +96,10 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
             {formatDuration(deal.duration_minutes)}
           </div>
           <div className="stops">
-            {deal.direct
+            {isDirect
               ? 'Nonstop'
               : `${(deal.stops || []).length} Stop${(deal.stops || []).length !== 1 ? 's' : ''}`}
-            {!deal.direct && deal.overnight_layover && (
+            {!isDirect && deal.overnight_layover && (
               <span
                 title="Includes an overnight layover"
                 className="overnight-warning"
@@ -145,7 +127,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
             )}
             {points.toLocaleString()}<span style={{ fontSize: '0.5em' }}> pts</span>
           </div>
-          <div className="fees">+ {fees}</div>
+          <div className="fees">+ {fees} USD</div>
         </div>
         {hasCashPrice &&
           (cabinData.exact_cpp && cabinData.exact_cpp !== 'N/A' ? (
@@ -157,7 +139,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
                 {`${cabinData.exact_cpp}¢`} / pt
               </div>
               <div className="fees">
-                (Cash) ${cabinData.exact_cash_price}
+                (Cash) ${cabinData.exact_cash_price} USD
               </div>
             </div>
           ) : (
@@ -192,8 +174,15 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
                 ))}
               </div>
             </div>
-            {cash_flight_details && (
-              <CashFlightDetails details={cash_flight_details} />
+            {deal.layover_lengths && deal.layover_lengths.length > 0 && (
+              <div className="detail-item">
+                <strong>Layovers:</strong>
+                <span>
+                  {deal.layover_lengths.map((duration, index) => (
+                    `Layover ${index + 1}: ${formatDuration(duration)}`
+                  )).join(', ')}
+                </span>
+              </div>
             )}
             <a
             href={booking_url}
@@ -295,8 +284,8 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
 
   const showDates = useMemo(() => {
     if (deals.length <= 1) return false;
-    const firstDate = deals[0].date;
-    return !deals.every(deal => deal.date === firstDate);
+    const firstDate = new Date(deals[0].departure_time).toDateString();
+    return !deals.every(deal => new Date(deal.departure_time).toDateString() === firstDate);
   }, [deals]);
 
   

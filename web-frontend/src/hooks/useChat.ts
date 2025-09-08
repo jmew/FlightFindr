@@ -187,6 +187,16 @@ export function useChat() {
                               Object.entries(parsedResult.legend).map(([k, v]) => [v, k])
                             );
                             const decompressedDeals = decompressObject(parsedResult.all_deals, reverseLegend);
+
+                            // Post-process to decompress transfer_info
+                            decompressedDeals.forEach((deal: any) => {
+                                if (deal.transfer_info && Array.isArray(deal.transfer_info)) {
+                                    deal.transfer_info = deal.transfer_info.map(
+                                        (bankCode: string) => reverseLegend[bankCode] || bankCode
+                                    );
+                                }
+                            });
+
                             console.log("Decompressed deals:", decompressedDeals);
 
                             const parsedFlightData: FlightDeal[] = decompressedDeals.map((deal: any, index: number) => ({

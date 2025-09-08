@@ -27,6 +27,28 @@ To run the services locally for development:
 
 This project has specific behaviors and solutions that are critical to its operation.
 
+1.  **`deals.json` Data Structure**
+    *   The `deals.json` file contains the result of a flight search. The data is compressed to save space.
+    *   **`legend`**: A dictionary that maps short keys to full field names. This is used for decompression.
+    *   **`all_deals`**: A list of flight deal objects.
+    *   **`transfer_info` (`ti`)**: This is a list of short codes representing bank transfer partners. The full bank names are defined in the `legend`.
+    *   **`exact_cash_price` (`ecp`) and `exact_cpp` (`epp`)**: These fields are only included if a matching cash price was found.
+    *   **`layover_lengths` (`ll`)**: This is an array of numbers, each representing the duration of a layover in minutes. It replaces the old `cash_flight_details` object.
+    *   **Redundant Fields**: The `date` and `direct` fields have been removed to save space and are derived on the frontend.
+
+### Key Learnings & Conventions
+
+This project has specific behaviors and solutions that are critical to its operation.
+
+1.  **`deals.json` Data Structure**
+    *   The `deals.json` file contains the result of a flight search. The data is compressed to save space.
+    *   **`legend`**: A dictionary that maps short keys to full field names. This is used for decompression.
+    *   **`all_deals`**: A list of flight deal objects.
+    *   **`transfer_info` (`ti`)**: This is a list of short codes representing bank transfer partners. The full bank names are defined in the `legend`.
+    *   **`exact_cash_price` (`ecp`) and `exact_cpp` (`epp`)**: These fields are only included if a matching cash price was found.
+    *   **`layover_lengths` (`ll`)**: This is an array of numbers, each representing the duration of a layover in minutes. It replaces the old `cash_flight_details` object.
+    *   **Redundant Fields**: The `date` and `direct` fields have been removed to save space and are derived on the frontend.
+
 2.  **Scraper Search Completion:**
     *   To detect when a flight search is complete, the scraper now waits for a specific network response containing `{"data": {"status": "done"}}`.
     *   This is much more reliable than waiting for UI elements like progress bars. This logic is located in the `scrape()` method of `pointsyeah.py`.

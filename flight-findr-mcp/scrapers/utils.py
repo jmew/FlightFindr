@@ -83,7 +83,12 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
                     passengers=Passengers(adults=1, children=0, infants_in_seat=0, infants_on_lap=0),
                     fetch_mode="fallback",
                 )
-                return [flight.__dict__ for flight in result.flights]
+                flights_with_date = []
+                for flight in result.flights:
+                    flight_dict = flight.__dict__
+                    flight_dict['date'] = date
+                    flights_with_date.append(flight_dict)
+                return flights_with_date
             except Exception as e:
                 if "no token provided" in str(e):
                     print(f"Rate limit error for {origin_airport}->{dest_airport} on {date}. Retrying with local Playwright...")
