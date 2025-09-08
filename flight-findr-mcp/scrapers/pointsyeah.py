@@ -10,13 +10,71 @@ from typing import List, Dict, Any, Optional
 from scrapers.utils import parse_time, fetch_cash_prices, PROGRAM_MAPPING
 from datetime import datetime, timedelta
 
+KEY_LEGEND = {
+    # Deal fields
+    "program": "pr",
+    "route": "rt",
+    "date": "d",
+    "departure_time": "dt",
+    "arrival_time": "at",
+    "duration_minutes": "dm",
+    "direct": "di",
+    "stops": "s",
+    "airlines": "al",
+    "overnight_layover": "ol",
+    "layover_duration": "ld",
+    "flight_numbers": "fn",
+    "booking_url": "bu",
+    "transfer_info": "ti",
+    "cash_flight_details": "cfd",
+    "economy": "e",
+    "premium": "p",
+    "business": "b",
+    "first": "f",
+
+    # Cabin fields
+    "points": "pt",
+    "fees": "fe",
+    "seats": "st",
+    "bonus": "bn",
+    "exact_cash_price": "ecp",
+    "exact_cpp": "epp",
+
+    # Cash flight details fields
+    "price": "prc",
+    "arrival_time_ahead": "ata",
+    "layover_details": "ldt",
+    "name": "n",
+    "flight_number": "fn", # Note: re-using from top-level
+
+    # Transfer info fields
+    "bank": "bk",
+    "actual_points": "ap",
+    "bonus_percentage": "bp",
+    "bonus_end_date": "bed",
+    "code": "c",
+}
+
+def clean_and_compress_dict(data, legend):
+    if isinstance(data, dict):
+        new_dict = {}
+        for k, v in data.items():
+            if v is not None and v != "" and v != []:
+                new_key = legend.get(k, k)
+                cleaned_v = clean_and_compress_dict(v, legend)
+                if cleaned_v is not None and cleaned_v != "" and cleaned_v != []:
+                    new_dict[new_key] = cleaned_v
+        return new_dict if new_dict else None
+    elif isinstance(data, list):
+        return [clean_and_compress_dict(i, legend) for i in data]
+    else:
+        return data
 
 class PointsYeahScraper:
     """
     A class to manage scraping PointsYeah.com. It encapsulates the browser session,
     scraping logic, and data processing.
     """
-    
 
     # --- Initialization and Lifecycle ---
 
@@ -103,12 +161,12 @@ class PointsYeahScraper:
         
         for result in results:
             if isinstance(result, Exception):
-                print(f"A search task failed")
+                print(f"A search task failed: {result}")
             else:
                 all_deals.extend(result)
 
         if not all_deals:
-            return json.dumps({"all_deals": [], "cheapest_deal": None}, indent=2)
+            return json.dumps({"legend": KEY_LEGEND, "all_deals": []}, indent=2)
 
         # Deduplicate and merge deals from multiple searches
         merged_deals = {}
@@ -137,24 +195,14 @@ class PointsYeahScraper:
                         or new_cabin_data["points"] < existing_cabin_data.get("points")
                     ):
                         existing_deal[cabin] = new_cabin_data
-                        if "source" in existing_deal and existing_deal["source"] != deal.get("source"):
-                            existing_deal["source"] = "multiple"
         
         unique_deals = list(merged_deals.values())
 
-        def get_best_points(deal):
-            for cabin in ['economy', 'premium', 'business', 'first']:
-                if deal.get(cabin) and deal[cabin].get('points'):
-                    return deal[cabin]['points']
-            return float('inf')
-
-        unique_deals.sort(key=get_best_points)
-        
-        cheapest_deal = unique_deals[0] if unique_deals else None
+        cleaned_deals = clean_and_compress_dict(unique_deals, KEY_LEGEND)
 
         result = {
-            "all_deals": unique_deals,
-            "cheapest_deal": cheapest_deal,
+            "legend": KEY_LEGEND,
+            "all_deals": cleaned_deals,
         }
 
         return json.dumps(result, indent=2)
@@ -215,7 +263,7 @@ class PointsYeahScraper:
 
         return [
             deal for deal in processed_deals_list
-            if deal['route'].split(' -> ')[0] == origin and deal['route'].split(' -> ')[1] == destination
+            if deal['route'].split(' -> ')[0] in origin and deal['route'].split(' -> ')[1] in destination
         ]
 
     def _process_deals(self, deals_chunk: List[Dict[str, Any]], best_deals: Dict[Any, Any]):
@@ -255,6 +303,14 @@ class PointsYeahScraper:
                             if arr_time.date() != dep_time.date():
                                 overnight_layover = True
                             layover_duration += (dep_time - arr_time).total_seconds() / 60
+                    
+                    transfer_info_raw = route.get("transfer") or []
+                    transfer_info = []
+                    for t in transfer_info_raw:
+                        if t.get("bank") not in ["Bilt", "WF"]:
+                            t.pop('url', None)
+                            t.pop('bonus_slogn', None)
+                            transfer_info.append(t)
 
                     best_deals[deal_key] = {
                         "program": normalized_program,
@@ -269,26 +325,25 @@ class PointsYeahScraper:
                         "overnight_layover": overnight_layover,
                         "layover_duration": layover_duration,
                         "flight_numbers": [s.get("flight_number") for s in valid_segments if s.get("flight_number")],
-                        "economy": None, "premium": None, "business": None, "first": None,
-                        "source": "pointsyeah"
+                        "booking_url": booking_url,
+                        "transfer_info": transfer_info,
+                        "cash_flight_details": None,
+                        "economy": None, "premium": None, "business": None, "first": None
                     }
 
                 cabin_key = "premium" if "premium" in cabin else "business" if "business" in cabin else "first" if "first" in cabin else "economy"
                 current_best = best_deals[deal_key].get(cabin_key)
 
                 if current_best is None or points < current_best.get('points', float('inf')):
-                    transfer_info = route.get("transfer") or []
                     bonus_info = next((
                         {"bank": t.get("bank"), "percentage": t.get("bonus_percentage"), "end_date": t.get("bonus_end_date")}
-                        for t in transfer_info if t.get("bonus_percentage", 0) > 0
+                        for t in best_deals[deal_key]["transfer_info"] if t.get("bonus_percentage", 0) > 0
                     ), None)
 
                     best_deals[deal_key][cabin_key] = {
                         "points": points,
                         "fees": f"${payment.get('tax')} {payment.get('currency')}",
                         "seats": payment.get("seats"),
-                        "booking_url": booking_url,
-                        "transfer_info": transfer_info,
                         "bonus": bonus_info
                     }
 
@@ -299,7 +354,6 @@ class PointsYeahScraper:
         for deal in deals:
             for cabin_prices in cash_prices_data:
                 cabin = cabin_prices['cabin']
-                # Map fast-flight's 'premium-economy' to pointsyeah's 'premium'
                 deal_cabin_key = 'premium' if cabin == 'premium-economy' else cabin
 
                 if not deal.get(deal_cabin_key) or not deal[deal_cabin_key].get('points'):
@@ -311,9 +365,6 @@ class PointsYeahScraper:
                 
                 points = deal[deal_cabin_key]['points']
 
-                
-
-                # Find exact match
                 award_departure_time = parse_time(deal.get('departure_time'))
                 award_num_stops = len(deal.get('stops', []))
                 award_stops = deal.get('stops', [])
@@ -325,23 +376,18 @@ class PointsYeahScraper:
                         if not cash_departure_time:
                             continue
 
-                        # 1. Match departure time (hour and minute)
                         time_match = (award_departure_time.hour == cash_departure_time.hour and
                                       award_departure_time.minute == cash_departure_time.minute)
-
-                        # 2. Match number of stops
                         stops_match = (award_num_stops == flight.get('stops'))
-
-                        # 3. Match layover airports for multi-stop flights
+                        
                         layover_match = False
                         if not stops_match:
-                            pass # No need to check layovers if stop counts differ
+                            pass
                         elif award_num_stops == 0:
-                            layover_match = True # Direct flights match
-                        else: # Flight with stops
+                            layover_match = True
+                        else:
                             cash_layover_details = flight.get('layover_details')
                             if cash_layover_details:
-                                # Extract 3-letter airport codes from the layover details string
                                 cash_stop_airports = re.findall(r'[A-Z]{3}', cash_layover_details)
                                 if set(award_stops) == set(cash_stop_airports):
                                     layover_match = True
@@ -351,20 +397,21 @@ class PointsYeahScraper:
                             break
                 
                 if exact_match_flight:
+                    if 'cash_flight_details' not in deal or deal['cash_flight_details'] is None:
+                        deal['cash_flight_details'] = exact_match_flight
+                    
                     try:
                         exact_price_str = exact_match_flight['price'].replace('$', '').replace(',', '')
                         exact_price = float(exact_price_str)
                         deal[deal_cabin_key]['exact_cash_price'] = exact_price
                         deal[deal_cabin_key]['exact_cpp'] = round((exact_price / points) * 100, 2) if points > 0 else 0
-                        deal[deal_cabin_key]['cash_flight_details'] = exact_match_flight
                     except (ValueError, TypeError, KeyError):
                         deal[deal_cabin_key]['exact_cash_price'] = 'N/A'
                         deal[deal_cabin_key]['exact_cpp'] = 'N/A'
-                        deal[deal_cabin_key]['cash_flight_details'] = None
                 else:
-                    deal[deal_cabin_key]['exact_cash_price'] = 'N/A'
-                    deal[deal_cabin_key]['exact_cpp'] = 'N/A'
-                    deal[deal_cabin_key]['cash_flight_details'] = None
+                    if 'exact_cash_price' not in deal.get(deal_cabin_key, {}):
+                        deal[deal_cabin_key]['exact_cash_price'] = 'N/A'
+                        deal[deal_cabin_key]['exact_cpp'] = 'N/A'
 
     async def _scrape_cash_prices(self, origin: str, destination: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         dates = []
@@ -451,9 +498,6 @@ async def main_test():
         scraper = await PointsYeahScraper.create()
         searches = [
             {"origin_airports": ["SEA"], "destination_airports": ["JFK"], "start_date": "2025-10-04", "end_date": "2025-10-04"}
-            # {"origin_airports": ["SEA"], "destination_airports": ["LHR"], "start_date": "2025-10-04", "end_date": "2025-10-10"},
-            # {"origin_airports": ["LHR"], "destination_airports": ["HKG"], "start_date": "2025-10-08", "end_date": "2025-10-14"},
-            # {"origin_airports": ["HKG"], "destination_airports": ["SEA"], "start_date": "2025-10-10", "end_date": "2025-10-18"},
         ]
         deals_json = await scraper.search_flights(searches)
         

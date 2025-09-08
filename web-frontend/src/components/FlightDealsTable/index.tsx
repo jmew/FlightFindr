@@ -7,74 +7,25 @@ import {
 } from 'react-icons/fi';
 import DealFilters from '../DealFilters';
 import Logo from '../Logo';
-import type { FlightDeal } from '../../types';
+import type { FlightDeal, SlimCashFlightDetails } from '../../types';
 import { formatDuration, formatFlightTimes } from '../../utils/formatters';
 import { getAirlineNameByCode } from '../../utils/airlineMappings';
 
-const CashFlightDetails = ({ details }: { details: any }) => {
-  if (!details || !details.flights) return null;
+const CashFlightDetails = ({ details }: { details: SlimCashFlightDetails }) => {
+  if (!details) return null;
 
   return (
     <div className="cash-flight-details" style={{ marginTop: '16px' }}>
-      {details.flights.map((segment: any, index: number) => (
-        <React.Fragment key={index}>
-          <div className="segment-details" style={{ marginBottom: '12px' }}>
-            <div>
-              {segment.departure_airport.time} • {segment.departure_airport.name} ({
-                segment.departure_airport.id
-              })
-            </div>
-            <div
-              style={{
-                marginLeft: '10px',
-                color: 'var(--gem-sys-color--on-surface-variant)',
-              }}
-            >
-              Travel time: {formatDuration(segment.duration)}
-            </div>
-            <div>
-              {segment.arrival_airport.time} • {segment.arrival_airport.name} ({
-                segment.arrival_airport.id
-              })
-            </div>
-
-            <p
-              style={{
-                margin: '4px 0 0 10px',
-                color: 'var(--gem-sys-color--on-surface-variant)',
-              }}
-            >
-              {segment.airline} {segment.flight_number} • {segment.aircraft}
+        <div className="segment-details" style={{ marginBottom: '12px' }}>
+            <p style={{ margin: '4px 0 0 10px', color: 'var(--gem-sys-color--on-surface-variant)'}}>
+              {details.name} {details.flight_number}
             </p>
-            {segment.amenities && (
-              <ul
-                style={{
-                  paddingLeft: '20px',
-                  margin: '8px 0',
-                  fontSize: '0.9em',
-                }}
-              >
-                {segment.amenities.map((amenity: any, i: number) => (
-                  <li key={i}>{amenity.description}</li>
-                ))}
-              </ul>
+            {details.layover_details && (
+              <div className="layover-details" style={{ marginLeft: '10px', padding: '8px', color: 'var(--gem-sys-color--on-surface-variant)'}}>
+                Layover: {details.layover_details}
+              </div>
             )}
-          </div>
-          {details.layovers && details.layovers[index] && (
-            <div
-              className="layover-details"
-              style={{
-                marginLeft: '10px',
-                padding: '8px',
-                color: 'var(--gem-sys-color--on-surface-variant)',
-              }}
-            >
-              Layover: {details.layovers[index].duration} in{' '}
-              {details.layovers[index].name} ({details.layovers[index].id})
-            </div>
-          )}
-        </React.Fragment>
-      ))}
+        </div>
     </div>
   );
 };
@@ -92,7 +43,9 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
 
   if (!cabinData) return null;
 
-  const { points, fees, booking_url, transfer_info, bonus } = cabinData;
+  const { points, fees, bonus } = cabinData;
+  const { booking_url, transfer_info, cash_flight_details } = deal;
+
   const transferPartners =
     transfer_info?.map((t: { bank: string }) => t.bank) || [];
   const [origin, destination] = deal.route.split(' -> ');
@@ -118,9 +71,9 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
   const displayName = getDisplayName(airlineName);
 
   const routeString =
-    deal.stops && deal.stops.length === 0
+    deal.direct
       ? `${origin} → ${destination}`
-      : `${origin} → ${deal.stops && deal.stops.join(' → ')} → ${destination}`;
+      : `${origin} → ${deal.stops.join(' → ')} → ${destination}`;
 
   const getCppColor = (cpp: number | string) => {
     if (typeof cpp === 'string') return 'inherit';
@@ -163,7 +116,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
           <div className="stops">
             {deal.direct
               ? 'Nonstop'
-              : `${deal.flight_numbers.length - 1} Stop(s)`}
+              : `${(deal.stops || []).length} Stop${(deal.stops || []).length !== 1 ? 's' : ''}`}
             {!deal.direct && deal.overnight_layover && (
               <span
                 title="Includes an overnight layover"
@@ -239,8 +192,8 @@ const DealRow: React.FC<DealRowProps> = ({ deal, cabin, showDate, hasCashPrice }
                 ))}
               </div>
             </div>
-            {cabinData.cash_flight_details && (
-              <CashFlightDetails details={cabinData.cash_flight_details} />
+            {cash_flight_details && (
+              <CashFlightDetails details={cash_flight_details} />
             )}
             <a
             href={booking_url}
@@ -282,7 +235,7 @@ const calculateTopFlightScore = (deal: FlightDeal, cheapestPrice: number, shorte
   const durationScore = deal.duration_minutes / shortestDuration;
 
   let stopsPenalty = 0;
-  const stopCount = deal.flight_numbers.length - 1;
+  const stopCount = (deal.stops || []).length;
   if (stopCount === 1) {
     stopsPenalty = 1;
   } else if (stopCount >= 2) {
@@ -361,7 +314,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
       if (deal.duration_minutes < shortest) {
         shortest = deal.duration_minutes;
       }
-      stops.add(deal.flight_numbers.length - 1);
+      stops.add((deal.stops || []).length);
       ['economy', 'premium', 'business', 'first'].forEach(cabin => {
         const cabinData = deal[cabin as keyof FlightDeal] as any;
         if (cabinData && cabinData.points) {
@@ -423,7 +376,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
       }
       
       if (stops.length > 0) {
-        const stopCount = deal.flight_numbers.length - 1;
+        const stopCount = (deal.stops || []).length;
         
         const stopConditions = {
           'Nonstop': stopCount === 0,

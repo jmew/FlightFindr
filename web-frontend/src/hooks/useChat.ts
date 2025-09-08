@@ -27,6 +27,21 @@ function parseMultiCityMessage(message: string) {
   return { startLocation, endLocation, intermediateStops, startDate, endDate, maxLength, constraints, flexible };
 }
 
+const decompressObject = (obj: any, reverseLegend: { [key: string]: string }): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(item => decompressObject(item, reverseLegend));
+  }
+  if (typeof obj !== 'object' || obj === null) {
+    return obj;
+  }
+  const decompressed: { [key: string]: any } = {};
+  for (const shortKey in obj) {
+    const longKey = reverseLegend[shortKey] || shortKey;
+    decompressed[longKey] = decompressObject(obj[shortKey], reverseLegend);
+  }
+  return decompressed;
+};
+
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -163,16 +178,31 @@ export function useChat() {
                     };
                     if (tool.name === 'check_flight_points_prices') {
                       try {
-                        const parsedResult = JSON.parse(data.result);
-                        if (parsedResult.all_deals) {
-                          const parsedFlightData: FlightDeal[] = parsedResult.all_deals.map((deal: any, index: number) => ({
-                            ...deal,
-                            id: `${deal.route}-${deal.departure_time}-${index}`,
-                          }));
-                          newFlightData = [...newFlightData, ...parsedFlightData];
+                        console.log("Raw tool result:", data.result);
+                        if (typeof data.result === 'string' && data.result.trim().startsWith('{')) {
+                          const parsedResult = JSON.parse(data.result);
+                          console.log("Parsed result:", parsedResult);
+                          if (parsedResult.all_deals && parsedResult.legend) {
+                            const reverseLegend = Object.fromEntries(
+                              Object.entries(parsedResult.legend).map(([k, v]) => [v, k])
+                            );
+                            const decompressedDeals = decompressObject(parsedResult.all_deals, reverseLegend);
+                            console.log("Decompressed deals:", decompressedDeals);
+
+                            const parsedFlightData: FlightDeal[] = decompressedDeals.map((deal: any, index: number) => ({
+                              ...deal,
+                              id: `${deal.route}-${deal.departure_time}-${index}`,
+                              flight_numbers: deal.flight_numbers || [],
+                              stops: deal.stops || [],
+                            }));
+                            console.log("Final parsed flight data:", parsedFlightData);
+                            newFlightData = [...newFlightData, ...parsedFlightData];
+                          }
+                        } else if (data.result) {
+                          console.warn('Tool result is not a valid JSON object:', data.result);
                         }
                       } catch (e) {
-                        console.error('Error parsing flight data:', e);
+                        console.error('Error parsing or decompressing flight data:', e);
                       }
                     }
                     return updatedTool;

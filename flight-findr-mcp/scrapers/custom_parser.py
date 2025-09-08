@@ -35,6 +35,9 @@ def parse_response(
             # --- Basic Flight Info ---
             name = safe(item.css_first("div.sSHqwe.tPgKwe.ogfYpf span")).text(strip=True)
             price = safe(item.css_first(".YMlIz.FpEdX")).text(strip=True) or "0"
+
+            if not name or price == "0":
+                continue
             
             # --- CORRECTED: More robust selectors for core flight details ---
             duration = safe(item.css_first(".gvkrdb")).text(strip=True)
@@ -56,13 +59,8 @@ def parse_response(
                     layover_info = layover_node.text(strip=True)
 
             # --- Emissions and Delays ---
-            delay = safe(item.css_first(".GsCCve")).text(strip=True) or None
             
             # --- Amenities and Baggage ---
-            amenities_nodes = item.css("div.b8_33-N6PNV .b8_33-bN97Pc")
-            amenities = [node.attr('aria-label') for node in amenities_nodes if node.attr('aria-label')] or None
-            baggage_node = item.css_first(".b8_33-bN97Pc.b8_33-L6cTce")
-            baggage = baggage_node.text(strip=True) if baggage_node else "Info not specified"
 
             # --- Flight Number from Emissions div ---
             flight_number = None
@@ -81,23 +79,15 @@ def parse_response(
             try:
                 stops_fmt = 0 if "Nonstop" in stops_text else int(stops_text.split(" ", 1)[0])
             except (ValueError, AttributeError):
-                stops_fmt = "Unknown"
+                stops_fmt = -1
 
             flights.append(
                 fast_flights.schema.Flight(
-                    is_best=is_best_flight,
                     name=name,
                     price=price.replace(",", ""),
                     departure=departure_time,
-                    arrival=arrival_time,
-                    arrival_time_ahead=arrival_time_ahead,
-                    duration=duration,
                     stops=stops_fmt,
-                    delay=delay,
-                    departure_airport_code=departure_airport_code,
-                    arrival_airport_code=arrival_airport_code,
-                    amenities=amenities,
-                    baggage=baggage,
+                    arrival_time_ahead=arrival_time_ahead,
                     flight_number=flight_number,
                     layover_details=layover_info,
                 )

@@ -13,38 +13,21 @@ export interface Message {
   flightData?: FlightDeal[];
 }
 
-interface AirportInfo {
-  name: string;
-  city: string;
-  country: string;
-  lat: number;
-  lon: number;
-}
-
 interface CabinDeal {
   points: number;
   fees: string;
-  booking_url: string;
   seats: number;
-  transfer_info: {
-    bank: string;
-    bonus_percentage: number;
-    bonus_end_date: string;
-  }[];
   bonus: {
     bank: string;
     percentage: number;
     end_date: string;
   } | null;
-  cheapest_cash_price?: number;
-  cheapest_cpp?: number;
   exact_cash_price?: number | string;
   exact_cpp?: number | string;
-  cash_flight_details?: any;
 }
 
 export interface FlightDeal {
-  id: string; // A unique identifier for the deal
+  id: string;
   program: string;
   route: string;
   date: string;
@@ -53,13 +36,20 @@ export interface FlightDeal {
   duration_minutes: number;
   direct: boolean;
   flight_numbers: string[];
-  origin_airport_info: AirportInfo;
-  destination_airport_info: AirportInfo;
-  source: string;
   stops?: string[];
   airlines?: string[];
   overnight_layover?: boolean;
   layover_duration?: number;
+  booking_url: string;
+  transfer_info: {
+    bank: string;
+    actual_points: number;
+    points: number;
+    bonus_percentage: number;
+    bonus_end_date: number | null;
+    code: string;
+  }[];
+  cash_flight_details?: any;
 
   economy?: CabinDeal;
   premium?: CabinDeal;

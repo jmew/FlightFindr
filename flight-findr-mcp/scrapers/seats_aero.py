@@ -83,7 +83,6 @@ class SeatsAeroScraper:
                 "points": trip['MileageCost'],
                 "fees": f"{trip['TaxesCurrencySymbol']}{trip['TotalTaxes']/100} {trip['TaxesCurrency']}",
                 "seats": trip['RemainingSeats'],
-                "direct": trip['Stops'] == 0,
             }
             processed_deals.append(deal)
         return processed_deals
