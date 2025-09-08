@@ -1,13 +1,17 @@
 import React from 'react';
 import { Dropdown, Form } from 'react-bootstrap';
 import { FiChevronDown, FiX } from 'react-icons/fi';
+import styles from './FilterChip.module.css';
 
 type FilterChipProps = {
   label: string;
   options?: string[];
   selectedOptions: string[];
   onChange: (selected: string[]) => void;
+  onClear: () => void;
   isMultiSelect?: boolean;
+  children?: React.ReactNode;
+  isActive: boolean;
   availableOptions?: string[];
 };
 
@@ -16,11 +20,12 @@ const FilterChip: React.FC<FilterChipProps> = ({
   options,
   selectedOptions,
   onChange,
+  onClear,
   isMultiSelect = true,
+  children,
+  isActive,
   availableOptions,
 }) => {
-  const isActive = selectedOptions.length > 0;
-
   const handleSelect = (option: string) => {
     if (isMultiSelect) {
       const newSelection = selectedOptions.includes(option)
@@ -34,33 +39,34 @@ const FilterChip: React.FC<FilterChipProps> = ({
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onChange([]);
+    onClear();
   };
 
   const getButtonLabel = () => {
     if (!isActive) return label;
-    if (isMultiSelect) {
-      if (selectedOptions.length === 1) return selectedOptions[0];
-      return `${selectedOptions.length} selected`;
+    if (label === 'Price') {
+      return `Up to ${selectedOptions[0]} pts`;
     }
-    return selectedOptions[0];
+    if (selectedOptions.length === 0) return label;
+    if (selectedOptions.length === 1) return selectedOptions[0];
+    return `${selectedOptions.length} selected`;
   };
 
   return (
-    <Dropdown className="filter-chip-dropdown" autoClose="outside">
-      <Dropdown.Toggle className={`filter-chip ${isActive ? 'active' : ''}`}>
+    <Dropdown className={styles.filterChipDropdown}>
+      <Dropdown.Toggle className={`${styles.dropdownToggle} ${isActive ? styles.active : ''}`}>
         {getButtonLabel()}
         {isActive ? (
-          <FiX className="chip-icon" onClick={handleClear} />
+          <FiX className={styles.chipIcon} onClick={handleClear} />
         ) : (
-          <FiChevronDown className="chip-icon" />
+          <FiChevronDown className={styles.chipIcon} />
         )}
       </Dropdown.Toggle>
 
-      {options && (
-        <Dropdown.Menu>
-          {options.map((option) => (
-            <Dropdown.ItemText key={option}>
+      <Dropdown.Menu popperConfig={{ strategy: 'fixed' }} renderOnMount className={styles.dropdownMenu}>
+        {options &&
+          options.map((option) => (
+            <Dropdown.ItemText key={option} onClick={(e) => e.stopPropagation()} className={styles.dropdownItemText}>
               <Form.Check
                 type={isMultiSelect ? 'checkbox' : 'radio'}
                 id={`${label}-${option}`}
@@ -69,11 +75,12 @@ const FilterChip: React.FC<FilterChipProps> = ({
                 onChange={() => handleSelect(option)}
                 name={isMultiSelect ? option : label}
                 disabled={!selectedOptions.includes(option) && availableOptions && !availableOptions.includes(option)}
+                className={styles.formCheckInput}
               />
             </Dropdown.ItemText>
           ))}
-        </Dropdown.Menu>
-      )}
+        {children && <div className="p-3"  onClick={(e) => e.stopPropagation()}>{children}</div>}
+      </Dropdown.Menu>
     </Dropdown>
   );
 };

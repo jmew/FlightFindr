@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { FiSend, FiSquare } from 'react-icons/fi';
 import type { Message } from '../../types';
-import MessageList from '../MessageList';
-import SuggestionBubbles from '../SuggestionBubbles';
-import WelcomeScreen from '../WelcomeScreen';
+import MessageList from './MessageList';
+import SuggestionBubbles from './SuggestionBubbles';
+import WelcomeScreen from '../home/WelcomeScreen';
 
 interface ChatConversationProps {
   messages: Message[];
@@ -28,6 +28,8 @@ const suggestionBubbles = [
   'HKG -> HND Dec 12',
   'LHR -> DOH Feb 4',
 ];
+
+import styles from './ChatConversation.module.css';
 
 const ChatConversation: React.FC<ChatConversationProps> = ({
   messages,
@@ -90,10 +92,10 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   }, [messages.length]);
 
   return (
-    <div className={`main-content ${isChatEmpty ? 'empty-chat' : ''}`}>
+    <div className={`${styles.mainContent} ${isChatEmpty ? styles.emptyChat : ''}`}>
       <WelcomeScreen handleSendMessage={handleSuggestionClick} isChatEmpty={isChatEmpty} />
       {!isChatEmpty && (
-        <div className="chat-conversation">
+        <div className={styles.chatConversation}>
           <MessageList
             messages={messages}
             isLoading={isLoading}
@@ -103,11 +105,11 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
           />
         </div>
       )}
-      <div className="input-area">
-        <form className="input-form" onSubmit={handleFormSubmit}>
+      <div className={styles.inputArea}>
+        <form className={styles.inputForm} onSubmit={handleFormSubmit}>
           <input
             type="text"
-            className="input-field"
+            className={styles.inputField}
             placeholder={
               isChatEmpty
                 ? placeholder
@@ -119,18 +121,18 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
           {isLoading ? (
             <button
               type="button"
-              className="stop-button"
+              className={styles.stopButton}
               onClick={handleStop}
             >
-              <FiSquare className="send-icon" />
+              <FiSquare className={styles.sendIcon} />
             </button>
           ) : (
             <button
               type="submit"
-              className="send-button"
+              className={styles.sendButton}
               disabled={!input.trim()}
             >
-              <FiSend className="send-icon" />
+              <FiSend className={styles.sendIcon} />
             </button>
           )}
         </form>

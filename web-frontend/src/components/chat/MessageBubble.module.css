@@ -1,0 +1,30 @@
+.message {
+  padding: 0 var(--gem-sys-spacing--m);
+  border-radius: var(--gem-sys-shape--corner-large);
+  word-wrap: break-word;
+  line-height: 1.5;
+}
+
+.userMessage {
+  background-color: var(--gem-sys-color--primary);
+  color: var(--gem-sys-color--surface);
+  align-self: flex-end;
+  border-top-right-radius: 4px;
+  width: fit-content;
+  max-width: 80%;
+}
+
+.userMessage p {
+  margin-top: 1em;
+}
+
+.botMessage {
+  color: var(--gem-sys-color--on-surface);
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.loadingMessage {
+  display: flex;
+  align-items: center;
+}

@@ -1,8 +1,9 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Message } from '../../types';
-import FlightDeals from '../FlightDealsTable';
-import ToolCall from '../ToolCall';
+import FlightDeals from '../deals/FlightDealsTable';
+import ToolCall from './ToolCall';
+import styles from './MessageBubble.module.css';
 
 interface MessageBubbleProps {
   msg: Message;
@@ -13,9 +14,7 @@ const MessageBubble = React.forwardRef<HTMLDivElement, MessageBubbleProps>(
     return (
       <div
         ref={ref}
-        className={
-          msg.sender === 'user' ? 'message user-message' : 'bot-message'
-        }
+        className={`${styles.message} ${msg.sender === 'user' ? styles.userMessage : styles.botMessage}`}
       >
         {msg.text && <ReactMarkdown>{msg.text}</ReactMarkdown>}
         {msg.tools && <ToolCall tools={msg.tools} />}

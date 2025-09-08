@@ -1,0 +1,62 @@
+.filterChipDropdown .dropdownToggle {
+  background-color: var(--gem-sys-color--surface-container);
+  border: 1px solid var(--gem-sys-color--surface-container);
+  color: rgb(210, 227, 252);
+  border-radius: 20px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Google Sans", Roboto, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.15px;
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.filterChipDropdown .dropdownToggle.active {
+  background-color: #3c4a68;
+  border-color: var(--gem-sys-color--primary);
+  color: var(--gem-sys-color--on-surface);
+}
+
+.filterChipDropdown .dropdownToggle::after {
+  display: none;
+}
+
+.chipIcon {
+  font-size: 1rem;
+}
+
+.dropdownMenu {
+  background-color: var(--gem-sys-color--surface-container);
+  border-color: var(--gem-sys-color--surface);
+  z-index: 1050;
+}
+
+.priceFilterLabel {
+  color: rgb(232, 234, 237);
+  font-size: 10px;
+}
+
+.priceRangeLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  color: rgb(232, 234, 237);
+}
+
+.formCheckInput:checked {
+  background-color: var(--gem-sys-color--primary);
+  border-color: var(--gem-sys-color--primary);
+}
+
+.formCheckLabel {
+  color: rgb(232, 234, 237);
+  font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+}

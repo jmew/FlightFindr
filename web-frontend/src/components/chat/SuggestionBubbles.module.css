@@ -1,0 +1,16 @@
+.suggestionBubblesContainer {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.suggestionBubble {
+  background-color: var(--gem-sys-color--surface-container);
+  color: var(--gem-sys-color--on-surface);
+  border: 1px solid var(--gem-sys-color--surface-container);
+  border-radius: 20px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}

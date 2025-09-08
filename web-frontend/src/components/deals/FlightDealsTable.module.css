@@ -1,0 +1,165 @@
+.dealsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Tighter spacing between rows */
+}
+
+.dealRowContainer {
+  background-color: var(--gem-sys-color--surface-container);
+  border-radius: var(--gem-sys-shape--corner-large);
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease-in-out;
+}
+
+.dealRowContainer:hover {
+  border-color: var(--gem-sys-color--primary);
+}
+
+.dealRow {
+  display: grid;
+  grid-template-columns: 0.5fr 2fr 1fr 1fr 1.25fr 0.5fr; /* 6 columns */
+  align-items: center;
+  padding: 16px;
+  cursor: pointer;
+  gap: 16px;
+}
+
+.cppInfo {
+  align-items: flex-end;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9rem;
+  color: var(--gem-sys-color--on-surface-variant);
+}
+
+.time,
+.duration,
+.pointsValue {
+  font-family: "Google Sans", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: rgb(232, 234, 237);
+}
+
+.route,
+.airlineName,
+.fees,
+.stops {
+  font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgb(154, 160, 166);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.overnightWarning {
+  color: #ffc107; /* A warning yellow */
+  display: inline-flex;
+  align-items: center;
+}
+
+
+.time sup {
+  font-size: 0.7em;
+  margin-left: 2px;
+}
+
+.airlineInfo {
+  gap: 4px !important;
+  align-items: flex-start;
+}
+
+.airlineInfo .logoIcon {
+  font-size: 28px; /* Slightly larger logo */
+}
+
+.pointsInfo {
+  align-items: flex-end;
+}
+
+.pointsValue {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fees {
+  font-size: 0.85rem;
+}
+
+.detailsToggle {
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+}
+
+.dealRowExpandedDetails {
+  padding: 16px;
+  border-top: 1px solid var(--gem-sys-color--surface);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.bookingOptionsContainer {
+  grid-column: 1 / -1; /* Span full width */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.bookingOptionCard {
+  background-color: var(--gem-sys-color--surface);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bookingOptionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+  color: var(--gem-sys-color--on-surface);
+}
+
+.transferPartnersSmall {
+  display: flex;
+  gap: 6px;
+}
+
+.cabinOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.cabinOption {
+  display: flex;
+  justify-content: space-between;
+  background-color: var(--gem-sys-color--surface-container);
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.cabinName {
+  font-weight: 500;
+}
+
+.cabinPoints {
+  color: var(--gem-sys-color--primary);
+}
+
+.cabinFees {
+  color: var(--gem-sys-color--on-surface-variant);
+}

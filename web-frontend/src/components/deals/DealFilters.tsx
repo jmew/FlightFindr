@@ -1,93 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Dropdown, Form } from 'react-bootstrap';
-import { FiChevronDown, FiX } from 'react-icons/fi';
+import { Form } from 'react-bootstrap';
+import FilterChip from './FilterChip';
+import styles from './DealFilters.module.css';
 
 const SORT_OPTIONS = [
   { value: 'top', label: 'Top Flights' },
   { value: 'points', label: 'Points (Lowest)' },
   { value: 'fees', label: 'Fees (Lowest)' },
 ];
-
-type FilterChipProps = {
-  label: string;
-  options?: string[];
-  selectedOptions: string[];
-  onChange: (selected: string[]) => void;
-  onClear: () => void;
-  isMultiSelect?: boolean;
-  children?: React.ReactNode;
-  isActive: boolean;
-  availableOptions?: string[];
-};
-
-const FilterChip: React.FC<FilterChipProps> = ({
-  label,
-  options,
-  selectedOptions,
-  onChange,
-  onClear,
-  isMultiSelect = true,
-  children,
-  isActive,
-  availableOptions,
-}) => {
-  const handleSelect = (option: string) => {
-    if (isMultiSelect) {
-      const newSelection = selectedOptions.includes(option)
-        ? selectedOptions.filter((item) => item !== option)
-        : [...selectedOptions, option];
-      onChange(newSelection);
-    } else {
-      onChange([option]);
-    }
-  };
-
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onClear();
-  };
-
-  const getButtonLabel = () => {
-    if (!isActive) return label;
-    if (label === 'Price') {
-      return `Up to ${selectedOptions[0]} pts`;
-    }
-    if (selectedOptions.length === 0) return label;
-    if (selectedOptions.length === 1) return selectedOptions[0];
-    return `${selectedOptions.length} selected`;
-  };
-
-  return (
-    <Dropdown className="filter-chip-dropdown">
-      <Dropdown.Toggle className={`filter-chip ${isActive ? 'active' : ''}`}>
-        {getButtonLabel()}
-        {isActive ? (
-          <FiX className="chip-icon" onClick={handleClear} />
-        ) : (
-          <FiChevronDown className="chip-icon" />
-        )}
-      </Dropdown.Toggle>
-
-      <Dropdown.Menu popperConfig={{ strategy: 'fixed' }} renderOnMount>
-        {options &&
-          options.map((option) => (
-            <Dropdown.ItemText key={option} onClick={(e) => e.stopPropagation()}>
-              <Form.Check
-                type={isMultiSelect ? 'checkbox' : 'radio'}
-                id={`${label}-${option}`}
-                label={option}
-                checked={selectedOptions.includes(option)}
-                onChange={() => handleSelect(option)}
-                name={isMultiSelect ? option : label}
-                disabled={!selectedOptions.includes(option) && availableOptions && !availableOptions.includes(option)}
-              />
-            </Dropdown.ItemText>
-          ))}
-        {children && <div className="p-3"  onClick={(e) => e.stopPropagation()}>{children}</div>}
-      </Dropdown.Menu>
-    </Dropdown>
-  );
-};
 
 interface DealFiltersProps {
   filters: {
@@ -115,7 +35,6 @@ const DealFilters: React.FC<DealFiltersProps> = ({
   availablePrograms,
   minPoints,
   maxPoints,
-  className,
   availableCabins,
   availableStops,
 }) => {
@@ -206,7 +125,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
       isActive: isPriceActive,
       children: (
         <>
-          <Form.Label className="price-filter-label">Max Points: {currentMax.toLocaleString()}</Form.Label>
+          <Form.Label className={styles.priceFilterLabel}>Max Points: {currentMax.toLocaleString()}</Form.Label>
           <Form.Range
             min={minPoints}
             max={maxPoints}
@@ -215,7 +134,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
             onMouseUp={handleSliderMouseUp}
             onTouchEnd={handleSliderMouseUp}
           />
-          <div className="price-range-labels">
+          <div className={styles.priceRangeLabels}>
             <span>{minPoints.toLocaleString()}</span>
             <span>{maxPoints.toLocaleString()}</span>
           </div>
@@ -243,10 +162,10 @@ const DealFilters: React.FC<DealFiltersProps> = ({
   const inactiveFilters = filtersConfig.filter(f => !f.isActive);
 
   return (
-    <div className={`deal-filters-container ${className || ''}`}>
+    <div className={styles.dealFiltersContainer}>
       <div
         ref={scrollContainerRef}
-        className={`filter-chips-scroll-container ${isScrollable ? 'is-scrollable' : ''}`}
+        className={`${styles.filterChipsScrollContainer} ${isScrollable ? styles.isScrollable : ''}`}
       >
         {inactiveFilters.map(filter => (
           <FilterChip key={filter.id} {...filter} />

@@ -1,0 +1,201 @@
+import React, { useState, useEffect } from 'react';
+import { FaPlaneDeparture, FaPlaneArrival, FaCalendarAlt, FaClock, FaCity, FaPlus, FaTrash } from 'react-icons/fa';
+import { Form, Button, Row, Col, InputGroup } from 'react-bootstrap';
+import styles from './WelcomeScreen.module.css';
+
+interface MultiCityFormProps {
+  handleSendMessage: (message: string) => void;
+}
+
+const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
+  const [startLocation, setStartLocation] = useState('');
+  const [endLocation, setEndLocation] = useState('');
+  const [intermediateStops, setIntermediateStops] = useState(['']);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [maxLength, setMaxLength] = useState('');
+  const [constraints, setConstraints] = useState('');
+  const [flexible, setFlexible] = useState(false);
+  const [isRoundTrip, setIsRoundTrip] = useState(true);
+
+  useEffect(() => {
+    if (isRoundTrip) {
+      setEndLocation(startLocation);
+    }
+  }, [isRoundTrip, startLocation]);
+
+  const handleAddStop = () => {
+    setIntermediateStops([...intermediateStops, '']);
+  };
+
+  const handleRemoveStop = (index: number) => {
+    const newStops = intermediateStops.filter((_, i) => i !== index);
+    setIntermediateStops(newStops);
+  };
+
+  const handleStopChange = (index: number, value: string) => {
+    const newStops = [...intermediateStops];
+    newStops[index] = value;
+    setIntermediateStops(newStops);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalEndLocation = isRoundTrip ? startLocation : endLocation;
+    let message = `Find a multi-city trip for me. `;
+    message += `I want to start in ${startLocation} and end in ${finalEndLocation}. `;
+    if (intermediateStops.length > 0 && intermediateStops[0] !== '') {
+      message += `I want to visit the following places: ${intermediateStops.join(', ')}. `;
+    }
+    message += `I want to travel between ${startDate} and ${endDate}, with a maximum trip length of ${maxLength} days. `;
+    if (flexible) {
+      message += `The order of the intermediate stops is flexible. `;
+    }
+    if (constraints) {
+      message += `Please also consider the following constraints: ${constraints}`;
+    }
+    handleSendMessage(message);
+  };
+
+  return (
+    <Form onSubmit={handleSubmit}>
+      <Row className="mb-3">
+        <Col md={6}>
+          <InputGroup>
+            <InputGroup.Text className={styles.inputGroupText}><FaPlaneDeparture /></InputGroup.Text>
+            <Form.Control
+              type="text"
+              placeholder="From"
+              value={startLocation}
+              onChange={(e) => setStartLocation(e.target.value)}
+              required
+              className={styles.formControl}
+            />
+          </InputGroup>
+        </Col>
+        <Col md={6}>
+          <InputGroup>
+            <InputGroup.Text className={styles.inputGroupText}><FaPlaneArrival /></InputGroup.Text>
+            <Form.Control
+              type="text"
+              placeholder="To (optional)"
+              value={endLocation}
+              onChange={(e) => setEndLocation(e.target.value)}
+              disabled={isRoundTrip}
+              className={styles.formControl}
+            />
+          </InputGroup>
+        </Col>
+      </Row>
+
+      <Form.Group className="mb-3">
+        <Form.Check 
+          type="checkbox"
+          label="Round trip"
+          id="round-trip-checkbox"
+          checked={isRoundTrip}
+          onChange={(e) => setIsRoundTrip(e.target.checked)}
+        />
+      </Form.Group>
+
+      {intermediateStops.map((stop, index) => (
+        <Row key={index} className={`mb-2 align-items-center ${styles.legRow}`}>
+          <Col md={10}>
+            <InputGroup>
+              <InputGroup.Text className={styles.inputGroupText}><FaCity /></InputGroup.Text>
+              <Form.Control
+                type="text"
+                placeholder={`Stop ${index + 1}`}
+                value={stop}
+                onChange={(e) => handleStopChange(index, e.target.value)}
+                required
+                className={styles.formControl}
+              />
+            </InputGroup>
+          </Col>
+          <Col md={2} className="text-end">
+            <Button variant="danger" size="sm" onClick={() => handleRemoveStop(index)}>
+              <FaTrash />
+            </Button>
+          </Col>
+        </Row>
+      ))}
+
+      <Row className="mb-3">
+        <Col xs={12}>
+          <Button variant="outline-primary" size="sm" onClick={handleAddStop}>
+            <FaPlus /> Add stop
+          </Button>
+        </Col>
+      </Row>
+
+      <Row className="mb-3">
+        <Col md={4}>
+          <InputGroup>
+            <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
+            <Form.Control
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              required
+              className={styles.formControl}
+            />
+          </InputGroup>
+        </Col>
+        <Col md={4}>
+          <InputGroup>
+            <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
+            <Form.Control
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              required
+              className={styles.formControl}
+            />
+          </InputGroup>
+        </Col>
+        <Col md={4}>
+           <InputGroup>
+            <InputGroup.Text className={styles.inputGroupText}><FaClock /></InputGroup.Text>
+            <Form.Control
+              type="number"
+              placeholder="Max trip length (days)"
+              value={maxLength}
+              onChange={(e) => setMaxLength(e.target.value)}
+              className={styles.formControl}
+            />
+          </InputGroup>
+        </Col>
+      </Row>
+
+      <Form.Group className="mb-3">
+        <Form.Control
+          as="textarea"
+          rows={2}
+          placeholder="Optional constraints (e.g., 'I prefer morning flights', 'Visit Paris before Rome')"
+          value={constraints}
+          onChange={(e) => setConstraints(e.target.value)}
+          className={styles.formControl}
+        />
+      </Form.Group>
+
+      <Form.Group className="mb-3">
+        <Form.Check 
+          type="checkbox"
+          label="Let us pick the order of the intermediate stops for the best itinerary"
+          id="flexible-itinerary-checkbox"
+          checked={flexible}
+          onChange={(e) => setFlexible(e.target.checked)}
+        />
+      </Form.Group>
+
+      <div className="d-grid">
+        <Button variant="primary" type="submit">
+          Find Itineraries
+        </Button>
+      </div>
+    </Form>
+  );
+}
+
+export default MultiCityForm;

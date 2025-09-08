@@ -1,5 +1,6 @@
 import type { Message } from '../../types';
-import MessageBubble from '../MessageBubble';
+import MessageBubble from './MessageBubble';
+import styles from './MessageList.module.css';
 
 interface MessageListProps {
   messages: Message[];
@@ -25,10 +26,10 @@ const MessageList: React.FC<MessageListProps> = ({
       />
     ))}
     {isLoading && (
-      <div className="thought-display">
-        <svg className="spinner" viewBox="0 0 50 50">
+      <div className={styles.thoughtDisplay}>
+        <svg className={styles.spinner} viewBox="0 0 50 50">
           <circle
-            className="path"
+            className={styles.path}
             cx="25"
             cy="25"
             r="20"
@@ -37,7 +38,7 @@ const MessageList: React.FC<MessageListProps> = ({
           />
         </svg>
         {thought && (
-          <span className="thought">
+          <span className={styles.thought}>
             {thought} ({elapsedTime}s, This may take up to 1 minute)
           </span>
         )}

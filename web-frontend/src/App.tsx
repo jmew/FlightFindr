@@ -1,5 +1,5 @@
 import './App.css';
-import ChatConversation from './components/ChatConversation';
+import ChatConversation from './components/chat/ChatConversation';
 import { useChat } from './hooks/useChat';
 
 const App: React.FC = () => {

@@ -1,0 +1,83 @@
+.chatApp {
+  display: flex;
+  justify-content: center;
+  height: 100vh;
+  width: 100%;
+}
+
+.mainContent {
+  width: 100%;
+  max-width: 860px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden; /* Prevent this container from scrolling */
+}
+
+.mainContent.emptyChat {
+  justify-content: center;
+}
+
+.chatConversation {
+  flex-grow: 1; /* Takes up all available space */
+  padding: 0 var(--gem-sys-spacing--l);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gem-sys-spacing--l);
+  overflow-y: auto; /* Allow this section to scroll */
+  padding-top: 60px;
+}
+
+.inputArea {
+  padding: var(--gem-sys-spacing--l);
+  position: relative;
+  flex-shrink: 0; /* Prevent it from shrinking */
+  padding-top: 24px;
+  padding-bottom: 60px;
+}
+
+.inputForm {
+  display: flex;
+  background-color: var(--gem-sys-color--surface-container);
+  border-radius: 28px;
+  padding: 4px;
+}
+
+.inputField {
+  flex-grow: 1;
+  padding: 14px 20px 14px 20px;
+  border: none;
+  background-color: transparent;
+  color: var(--gem-sys-color--on-surface);
+  font-size: 1rem;
+  outline: none;
+}
+
+.sendButton, .stopButton {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--gem-sys-color--primary);
+}
+
+.sendIcon {
+  width: 28px;
+  height: 28px;
+}
+
+.sendButton:disabled {
+  background-color: var(--gem-sys-color--surface-container);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.stopButton {
+  background-color: #dc3545;
+}

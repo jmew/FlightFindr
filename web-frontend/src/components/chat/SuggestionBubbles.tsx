@@ -1,3 +1,5 @@
+import styles from './SuggestionBubbles.module.css';
+
 interface SuggestionBubblesProps {
   suggestions: string[];
   onSuggestionClick: (suggestion: string) => void;
@@ -8,11 +10,11 @@ const SuggestionBubbles = ({
   onSuggestionClick,
 }: SuggestionBubblesProps) => {
   return (
-    <div className="suggestion-bubbles-container">
+    <div className={styles.suggestionBubblesContainer}>
       {suggestions.map((suggestion, index) => (
         <button
           key={index}
-          className="suggestion-bubble"
+          className={styles.suggestionBubble}
           onClick={() => onSuggestionClick(suggestion)}
         >
           {suggestion}
