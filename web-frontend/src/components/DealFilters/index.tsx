@@ -17,6 +17,7 @@ type FilterChipProps = {
   isMultiSelect?: boolean;
   children?: React.ReactNode;
   isActive: boolean;
+  availableOptions?: string[];
 };
 
 const FilterChip: React.FC<FilterChipProps> = ({
@@ -28,6 +29,7 @@ const FilterChip: React.FC<FilterChipProps> = ({
   isMultiSelect = true,
   children,
   isActive,
+  availableOptions,
 }) => {
   const handleSelect = (option: string) => {
     if (isMultiSelect) {
@@ -77,6 +79,7 @@ const FilterChip: React.FC<FilterChipProps> = ({
                 checked={selectedOptions.includes(option)}
                 onChange={() => handleSelect(option)}
                 name={isMultiSelect ? option : label}
+                disabled={!selectedOptions.includes(option) && availableOptions && !availableOptions.includes(option)}
               />
             </Dropdown.ItemText>
           ))}
@@ -99,6 +102,8 @@ interface DealFiltersProps {
   availablePrograms: string[];
   minPoints: number;
   maxPoints: number;
+  availableCabins: string[];
+  availableStops: string[];
   className?: string;
 }
 
@@ -111,6 +116,8 @@ const DealFilters: React.FC<DealFiltersProps> = ({
   minPoints,
   maxPoints,
   className,
+  availableCabins,
+  availableStops,
 }) => {
   const [currentMax, setCurrentMax] = useState(filters.maxPoints || maxPoints);
   const isPriceActive = filters.maxPoints !== null;
@@ -168,6 +175,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
       onChange: (selected: string[]) => handleFilterChange('stops', selected),
       onClear: () => handleFilterChange('stops', []),
       isActive: filters.stops.length > 0,
+      availableOptions: availableStops,
       isMultiSelect: false,
     },
     {
@@ -187,6 +195,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
       onChange: (selected: string[]) => handleFilterChange('cabinClasses', selected),
       onClear: () => handleFilterChange('cabinClasses', []),
       isActive: filters.cabinClasses.length > 0,
+      availableOptions: availableCabins,
     },
     {
       id: 'price',

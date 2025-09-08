@@ -8,6 +8,7 @@ type FilterChipProps = {
   selectedOptions: string[];
   onChange: (selected: string[]) => void;
   isMultiSelect?: boolean;
+  availableOptions?: string[];
 };
 
 const FilterChip: React.FC<FilterChipProps> = ({
@@ -16,6 +17,7 @@ const FilterChip: React.FC<FilterChipProps> = ({
   selectedOptions,
   onChange,
   isMultiSelect = true,
+  availableOptions,
 }) => {
   const isActive = selectedOptions.length > 0;
 
@@ -66,6 +68,7 @@ const FilterChip: React.FC<FilterChipProps> = ({
                 checked={selectedOptions.includes(option)}
                 onChange={() => handleSelect(option)}
                 name={isMultiSelect ? option : label}
+                disabled={!selectedOptions.includes(option) && availableOptions && !availableOptions.includes(option)}
               />
             </Dropdown.ItemText>
           ))}

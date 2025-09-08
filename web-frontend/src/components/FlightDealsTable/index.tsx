@@ -348,48 +348,60 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
 
   
 
-  const { availablePrograms, minPoints, maxPoints, shortestDuration } = useMemo(() => {
+  const { availablePrograms, minPoints, maxPoints, shortestDuration, availableCabins, availableStops } = useMemo(() => {
     const programs = new Set<string>();
+    const cabins = new Set<string>();
+    const stops = new Set<number>();
     let min = Infinity;
     let max = 0;
     let shortest = Infinity;
+
     deals.forEach(deal => {
       programs.add(deal.program);
       if (deal.duration_minutes < shortest) {
         shortest = deal.duration_minutes;
       }
+      stops.add(deal.flight_numbers.length - 1);
       ['economy', 'premium', 'business', 'first'].forEach(cabin => {
         const cabinData = deal[cabin as keyof FlightDeal] as any;
         if (cabinData && cabinData.points) {
+          cabins.add(cabin.charAt(0).toUpperCase() + cabin.slice(1));
           if (cabinData.points < min) min = cabinData.points;
           if (cabinData.points > max) max = cabinData.points;
         }
       });
     });
+
+    const availableStops: string[] = [];
+    if (stops.has(0)) availableStops.push('Nonstop');
+    if (stops.has(1)) availableStops.push('1 Stop');
+    if ([...stops].some(count => count >= 2)) availableStops.push('2+ Stops');
+
     return {
       availablePrograms: Array.from(programs).sort(),
       minPoints: min === Infinity ? 0 : min,
       maxPoints: max === 0 ? 100000 : max,
       shortestDuration: shortest === Infinity ? 1 : shortest,
+      availableCabins: Array.from(cabins),
+      availableStops,
     };
   }, [deals]);
 
   const dealsWithCabin = useMemo(() => {
-    const cabinPriority: ('economy' | 'premium' | 'business' | 'first')[] = [
-      'economy',
-      'premium',
-      'business',
-      'first',
-    ];
-
-    return deals.map((deal) => {
-      for (const cabin of cabinPriority) {
-        if (deal[cabin]) {
-          return { ...deal, displayCabin: cabin };
+    const newDeals: (FlightDeal & { displayCabin: string })[] = [];
+    deals.forEach(deal => {
+      ['economy', 'premium', 'business', 'first'].forEach(cabin => {
+        const cabinKey = cabin as keyof FlightDeal;
+        if (deal[cabinKey]) {
+          newDeals.push({
+            ...deal,
+            id: `${deal.id}-${cabin}`,
+            displayCabin: cabin,
+          });
         }
-      }
-      return { ...deal, displayCabin: 'economy' as const }; // Fallback
+      });
     });
+    return newDeals;
   }, [deals]);
 
   const filteredDeals = useMemo(() => {
@@ -508,6 +520,8 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
         minPoints={minPoints}
         maxPoints={maxPoints}
         className={isStuck ? 'is-stuck' : ''}
+        availableCabins={availableCabins}
+        availableStops={availableStops}
       />
       <div className="deals-container">
         {sortedDeals.map((deal) => (

@@ -102,7 +102,6 @@ export async function chatHandler(req: Request, res: Response) {
               abortController.signal,
             );
 
-            console.log('Tool response:', JSON.stringify(toolResponse, null, 2));
             if (toolResponse?.responseParts) {
               toolResponseParts.push(toolResponse.responseParts as any);
             }
