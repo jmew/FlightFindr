@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import DealFilters from './DealFilters';
 import DealRow from './DealRow';
+import PaginationControls from './PaginationControls';
 import type { CompactFlightDeal, BookingOption, CabinDeal } from '../../types';
 import styles from './FlightDealsTable.module.css';
 
@@ -75,6 +76,8 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
   const [sortBy, setSortBy] = useState('top');
   const [isStuck, setIsStuck] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -143,6 +146,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
   }, [deals]);
 
   const filteredDeals = useMemo(() => {
+    setCurrentPage(1);
     return deals.filter((deal) => {
       const { cabinClasses, airlinePrograms, stops, maxPoints } = filters;
 
@@ -238,6 +242,12 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
     });
   }, [filteredDeals, sortBy, minPoints, shortestDuration, filters.cabinClasses]);
 
+  const paginatedDeals = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return sortedDeals.slice(startIndex, endIndex);
+  }, [sortedDeals, currentPage, itemsPerPage]);
+
   const hasAnyCashPrice = useMemo(() => {
     return sortedDeals.some(deal => {
       return deal.options.some(option => {
@@ -265,7 +275,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
         availableStops={availableStops}
       />
       <div className={styles.dealsContainer}>
-        {sortedDeals.map((deal) => (
+        {paginatedDeals.map((deal) => (
           <React.Fragment key={deal.id}>
             <DealRow
               deal={deal}
@@ -275,6 +285,13 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
           </React.Fragment>
         ))}
       </div>
+      <PaginationControls
+        currentPage={currentPage}
+        itemsPerPage={itemsPerPage}
+        totalItems={sortedDeals.length}
+        onPageChange={setCurrentPage}
+        onItemsPerPageChange={setItemsPerPage}
+      />
     </>
   );
 };

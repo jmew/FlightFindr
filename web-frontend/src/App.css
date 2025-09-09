@@ -24,7 +24,7 @@ body {
   margin: 0;
   font-family: 'Google Sans', sans-serif;
   background-color: var(--gem-sys-color--surface);
-  color: var(--gem-sys-color--on-surface);
+  color: rgb(232, 234, 237);
 }
 
 /* On mobile, when chat is empty, explicitly prevent body scroll */
@@ -72,7 +72,7 @@ body.empty-chat-mobile-lock {
   border-radius: 10px;
   padding: var(--gem-sys-spacing--m);
   margin-top: var(--gem-sys-spacing--s);
-  font-family: 'Google Sans Mono', monospace;
+  font-family: 'Google Sans', monospace;
   font-size: 0.875rem;
 }
 

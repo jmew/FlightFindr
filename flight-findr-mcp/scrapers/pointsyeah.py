@@ -479,18 +479,24 @@ class PointsYeahScraper:
         lower_program_name = program_name.strip().lower()
         return PROGRAM_MAPPING.get(lower_program_name, program_name.strip())
 
+import time
 async def main_test():
     """Test function to run the scraper for a sample search."""
     scraper = None
     try:
         scraper = await PointsYeahScraper.create()
         searches = [
-            {"origin_airports": ["SEA"], "destination_airports": ["JFK"], "start_date": "2025-10-04", "end_date": "2025-10-04"},
+            # {"origin_airports": ["SEA"], "destination_airports": ["JFK"], "start_date": "2025-10-04", "end_date": "2025-10-04"},
+            {"origin_airports": ["SEA"], "destination_airports": ["LHR"], "start_date": "2025-10-04", "end_date": "2025-10-10"},
+            {"origin_airports": ["LHR"], "destination_airports": ["HKG"], "start_date": "2025-10-08", "end_date": "2025-10-14"},
+            {"origin_airports": ["HKG"], "destination_airports": ["SEA"], "start_date": "2025-10-10", "end_date": "2025-10-18"},
         ]
+        start_time = time.perf_counter()
         deals_json = await scraper.search_flights(searches)
         
         deals_data = json.loads(deals_json)
         print(f"Found {len(deals_data.get('deals', []))} deals.")
+        end_time = time.perf_counter()
         
         flight_count = 0
         for deal in deals_data.get('deals', []):
@@ -499,6 +505,10 @@ async def main_test():
                 cabins = option[3]
                 flight_count += len(cabins)
         print(f"Found {flight_count} individual flight options.")
+
+        duration = end_time - start_time
+
+        print(f"The search took {duration} seconds.")
 
         with open("deals.json", 'w') as f:
             json.dump(deals_data, f, indent=2)

@@ -37,26 +37,13 @@
   z-index: 1050;
 }
 
-.priceFilterLabel {
-  color: rgb(232, 234, 237);
-  font-size: 10px;
-}
 
-.priceRangeLabels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 8px;
-  color: rgb(232, 234, 237);
-}
 
 .formCheckInput:checked {
   background-color: var(--gem-sys-color--primary);
   border-color: var(--gem-sys-color--primary);
 }
 
-.formCheckLabel {
-  color: rgb(232, 234, 237);
-  font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px;
-  font-weight: 400;
+.dropdownItemText {
+  color: rgb(232, 234, 237) !important;
 }

@@ -220,7 +220,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, showDate, hasCashPrice }) => {
                     rel="noopener noreferrer"
                     className="deal-card-book-btn"
                   >
-                    Go to Booking
+                    Book Award Flight
                   </a>
                 </div>
               ))}

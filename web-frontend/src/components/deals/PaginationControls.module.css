@@ -1,0 +1,35 @@
+.paginationContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  color: var(--gem-sys-color--on-surface-variant);
+}
+
+.pageControls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.pageControls button {
+  background-color: var(--gem-sys-color--surface-container);
+  color: var(--gem-sys-color--on-surface);
+  border: 1px solid var(--gem-sys-color--surface-container);
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.pageControls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.itemsPerPageSelector select {
+  background-color: var(--gem-sys-color--surface-container);
+  color: var(--gem-sys-color--on-surface);
+  border: 1px solid var(--gem-sys-color--surface-container);
+  border-radius: 8px;
+  padding: 8px;
+}
