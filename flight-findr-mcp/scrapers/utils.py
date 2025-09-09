@@ -51,15 +51,10 @@ LEGEND = {
     }
 }
 
-PROGRAM_MAPPING = {
-    "AR": "Aerolineas Argentinas", "AM": "Aeromexico", "AC": "Air Canada",
-    "KL": "Air France/KLM", "AS": "Alaska Airlines", "AA": "American Airlines",
-    "AV": "Avianca", "DL": "Delta", "EK": "Emirates", "EY": "Etihad",
-    "AY": "Finnair", "IB": "Iberia", "B6": "JetBlue", "LH": "Lufthansa",
-    "QF": "Qantas", "SK": "SAS", "SQ": "Singapore Airlines", "NK": "Spirit",
-    "TP": "TAP Portugal", "TK": "Turkish Airlines", "UA": "United Airlines",
-    "VS": "Virgin Atlantic", "VA": "Virgin Australia",
-}
+def normalize_program_name(program_name: Optional[str]) -> Optional[str]:
+    if not program_name:
+        return None
+    return program_name.strip()
 
 def parse_time(time_str: str) -> Optional[datetime.time]:
     """Parses time from various formats into a time object."""
@@ -128,8 +123,7 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
                         flight_dict['date'] = date
                         flights_with_date.append(flight_dict)
                     return flights_with_date # Success
-                except Exception as e:
-                    print(f"Attempt {attempt + 1} (fallback) failed for {origin_airport}->{dest_airport} on {date}: {e}")
+                except Exception:
                     if attempt < max_fallback_retries - 1:
                         await asyncio.sleep(1) # wait before next retry
             

@@ -1,25 +1,27 @@
 import os
 import sys
-from playwright.async_api import async_playwright, Page, Browser, Playwright
+from playwright.async_api import async_playwright, Browser, Playwright
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
 import asyncio
 import re
 from typing import List, Dict, Any, Optional, Tuple
-from scrapers.utils import parse_time, fetch_cash_prices, PROGRAM_MAPPING, LEGEND
+from scrapers.utils import parse_time, fetch_cash_prices, normalize_program_name, LEGEND
 from datetime import datetime, timedelta
 import pytz
 import airportsdata
 import functools
 
 class PointsYeahScraper:
+    CONCURRENCY_LIMIT = 5
+
     def __init__(self, playwright: Playwright, headless: bool = True):
         self.playwright: Playwright = playwright
         self.headless = headless
         self.browser: Optional[Browser] = None
         self.LEGEND = LEGEND
-        self.PROGRAM_CODES = {self._normalize_program_name(v): k for k, v in self.LEGEND["programs"].items()}
+        self.PROGRAM_CODES = {normalize_program_name(v): k for k, v in self.LEGEND["programs"].items()}
         self.BANK_CODES = {v: k for k, v in self.LEGEND["banks"].items()}
         self.CABIN_CODES_REVERSE = {v: k for k, v in self.LEGEND["cabin_codes"].items()}
         self.airports = airportsdata.load('IATA')
@@ -54,7 +56,6 @@ class PointsYeahScraper:
         if not self.browser:
             return json.dumps({"error": "Browser not initialized"})
 
-        # 1. SETUP cash price searches (no await)
         cash_price_tasks = []
         unique_cash_searches = set()
         for job in jobs:
@@ -75,7 +76,6 @@ class PointsYeahScraper:
                             cash_price_tasks.append(self._scrape_cash_prices(leg_data["origin"], leg_data["destination"], leg_data["start_date"], leg_data["end_date"]))
                             unique_cash_searches.add(cash_search_tuple)
 
-        # Helper function to encapsulate points scraping lifecycle
         async def run_points_searches():
             script_dir = os.path.dirname(os.path.abspath(__file__))
             auth_file_path = os.path.join(script_dir, "auth_state.json")
@@ -86,9 +86,8 @@ class PointsYeahScraper:
                 "storage_state": auth_file_path
             }
             
-            CONCURRENCY_LIMIT = 3
-            contexts = [await self.browser.new_context(**context_options) for _ in range(CONCURRENCY_LIMIT)]
-            semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+            contexts = [await self.browser.new_context(**context_options) for _ in range(self.CONCURRENCY_LIMIT)]
+            semaphore = asyncio.Semaphore(self.CONCURRENCY_LIMIT)
 
             async def scrape_with_semaphore(context, job):
                 async with semaphore:
@@ -100,19 +99,16 @@ class PointsYeahScraper:
                     return {}
 
             try:
-                search_tasks = [scrape_with_semaphore(contexts[i % CONCURRENCY_LIMIT], job) for i, job in enumerate(jobs)]
+                search_tasks = [scrape_with_semaphore(contexts[i % self.CONCURRENCY_LIMIT], job) for i, job in enumerate(jobs)]
                 return await asyncio.gather(*search_tasks, return_exceptions=True)
             finally:
-                # Close all browser contexts concurrently and robustly.
                 await asyncio.gather(*(c.close() for c in contexts), return_exceptions=True)
 
-        # 2. Create and run cash and points scraping tasks in parallel
         cash_future = asyncio.gather(*cash_price_tasks, return_exceptions=True)
         points_task = asyncio.create_task(run_points_searches())
         
         all_cash_prices_results, points_results = await asyncio.gather(cash_future, points_task)
 
-        # 3. Process points results
         all_deals_dict: Dict[tuple, Tuple[int, dict]] = {}
         for result in points_results:
             if isinstance(result, Exception):
@@ -135,11 +131,9 @@ class PointsYeahScraper:
                             if cabin_code not in existing_cabins or cabin_deal[0] < existing_cabins[cabin_code][0]:
                                 existing_cabins[cabin_code] = cabin_deal
         
-        # 4. Match cash prices
         valid_cash_results = [r for r in all_cash_prices_results if not isinstance(r, Exception)]
         self._match_cash_prices(all_deals_dict, valid_cash_results)
 
-        # 5. Format and return
         if not all_deals_dict:
             return json.dumps({"legend": self.LEGEND, "deals": []}, indent=2)
 
@@ -166,7 +160,6 @@ class PointsYeahScraper:
         valid_routes = set(tuple(r) for r in job.get("valid_routes", []))
 
         page = await context.new_page()
-        # ... (rest of the scraping logic is the same as _scrape_one_search)
         
         print(f"Searching MATRIX from {','.join(origins)} to {','.join(destinations)} between {start_date} and {end_date}...")
         best_deals: Dict[Any, Any] = {}
@@ -193,7 +186,7 @@ class PointsYeahScraper:
         try:
             search_url = self._build_matrix_url(origins, destinations, start_date, end_date)
             await page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
-            await asyncio.wait_for(search_done_future, timeout=150)
+            await asyncio.wait_for(search_done_future, timeout=120)
             
             filtered_deals = {}
             for segments, (duration, program_options) in best_deals.items():
@@ -204,7 +197,7 @@ class PointsYeahScraper:
                     filtered_deals[segments] = (duration, program_options)
             return filtered_deals
         except Exception as e:
-            print(f"An error occurred during matrix scraping: {e}")
+            print(f"An error occurred during matrix scraping: {e.__class__.__name__}: {e}")
             return {}
         finally:
             await page.close()
@@ -214,7 +207,6 @@ class PointsYeahScraper:
         leg2 = job.get("leg2")
 
         page = await context.new_page()
-        # ... (scraping logic is the same)
 
         print(f"Searching MULTI-CITY from {leg1['origin']}-{leg1['destination']} and {leg2['origin']}-{leg2['destination']}...")
         best_deals: Dict[Any, Any] = {}
@@ -241,30 +233,34 @@ class PointsYeahScraper:
         try:
             search_url = self._build_multicity_url(leg1, leg2)
             await page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
-            await asyncio.wait_for(search_done_future, timeout=150)
+            await asyncio.wait_for(search_done_future, timeout=120)
             
-            # In multicity, all returned routes are valid
             return best_deals
         except Exception as e:
-            print(f"An error occurred during multicity scraping: {e}")
+            print(f"An error occurred during multicity scraping: {e.__class__.__name__}: {e}")
             return {}
         finally:
             await page.close()
 
+    def _get_base_search_url(self) -> str:
+        return (
+            "https://www.pointsyeah.com/search?cabins=Economy%2CPremium+Economy%2CBusiness%2CFirst"
+            "&cabin=Economy"
+            "&banks=Amex%2CCapital+One%2CChase"
+            "&airlineProgram=AR%2CAM%2CAC%2CKL%2CAS%2CAV%2CDL%2CEK%2CEY%2CAY%2CIB%2CB6%2CQF%2CSQ%2CTP%2CTK%2CUA%2CVS"
+            "&adults=1"
+            "&children=0"
+        )
+
     def _build_matrix_url(self, origins: List[str], destinations: List[str], start_date: str, end_date: str) -> str:
-        # ... same as the most recent _build_search_url
+        base_url = self._get_base_search_url()
         multiday = "true" if start_date != end_date else "false"
         depart_date_sec = end_date if multiday == "true" else start_date
         departure_str = ",".join(origins)
         arrival_str = ",".join(destinations)
         return (
-            f"https://www.pointsyeah.com/search?cabins=Economy%2CPremium+Economy%2CBusiness%2CFirst"
-            f"&cabin=Economy"
-            f"&banks=Amex%2CCapital+One%2CChase"
-            f"&airlineProgram=AR%2CAM%2CAC%2CKL%2CAS%2CAV%2CDL%2CEK%2CEY%2CAY%2CIB%2CB6%2CQF%2CSQ%2CTP%2CTK%2CUA%2CVS"
+            f"{base_url}"
             f"&tripType=1"
-            f"&adults=1"
-            f"&children=0"
             f"&departure={departure_str}"
             f"&arrival={arrival_str}"
             f"&departDate={start_date}"
@@ -273,14 +269,7 @@ class PointsYeahScraper:
         )
 
     def _build_multicity_url(self, leg1: Dict[str, str], leg2: Dict[str, str]) -> str:
-        base_url = (
-            f"https://www.pointsyeah.com/search?cabins=Economy%2CPremium+Economy%2CBusiness%2CFirst"
-            f"&cabin=Economy"
-            f"&banks=Amex%2CCapital+One%2CChase"
-            f"&airlineProgram=AR%2CAM%2CAC%2CKL%2CAS%2CAV%2CDL%2CEK%2CEY%2CAY%2CIB%2CB6%2CQF%2CSQ%2CTP%2CTK%2CUA%2CVS"
-            f"&adults=1"
-            f"&children=0"
-        )
+        base_url = self._get_base_search_url()
         return (
             f"{base_url}"
             f"&tripType=3"
@@ -300,7 +289,7 @@ class PointsYeahScraper:
         program_code = code
         if not program_code:
             program_name = program
-            normalized_program = self._normalize_program_name(program_name)
+            normalized_program = normalize_program_name(program_name)
             if not normalized_program:
                 return None
             program_code = self.PROGRAM_CODES.get(normalized_program)
@@ -446,12 +435,14 @@ class PointsYeahScraper:
 
                         num_stops = flight.get('stops', -1)
                         
-                        # Use the origin/destination from the preserved context
+                        layover_details = flight.get('layover_details', '')
+                        stop_airports = tuple(sorted(re.findall(r'[A-Z]{3}', layover_details)))
+
                         key = (origin, destination, departure_date, departure_time_obj.hour, departure_time_obj.minute, num_stops)
                         
                         if key not in cash_flights_map:
                             cash_flights_map[key] = []
-                        cash_flights_map[key].append({**flight, 'cabin_code': cash_cabin_code})
+                        cash_flights_map[key].append({**flight, 'cabin_code': cash_cabin_code, 'stop_airports': stop_airports})
                     except (ValueError, TypeError):
                         continue
 
@@ -470,8 +461,8 @@ class PointsYeahScraper:
             award_departure_time = award_departure_datetime.time()
             award_departure_date = award_departure_datetime.date()
             
-            award_stops_airports = [s[2] for s in segments[:-1]]
-            award_num_stops = len(award_stops_airports)
+            award_num_stops = len(segments) - 1
+            award_stops_tuple = tuple(sorted(s[2] for s in segments[:-1]))
 
             lookup_key = (award_origin, award_destination, award_departure_date, award_departure_time.hour, award_departure_time.minute, award_num_stops)
             
@@ -483,11 +474,8 @@ class PointsYeahScraper:
                 if award_num_stops == 0:
                     layover_match = True
                 else:
-                    cash_layover_details = cash_flight.get('layover_details')
-                    if cash_layover_details:
-                        cash_stop_airports = re.findall(r'[A-Z]{3}', cash_layover_details)
-                        if set(award_stops_airports) == set(cash_stop_airports):
-                            layover_match = True
+                    if award_stops_tuple == cash_flight.get('stop_airports'):
+                        layover_match = True
                 
                 if layover_match:
                     try:
@@ -516,40 +504,6 @@ class PointsYeahScraper:
         results = await asyncio.gather(*cash_price_tasks)
         return {"origin": origin, "destination": destination, "cabin_prices": results}
 
-    def _build_search_url(self, origins: List[str], destinations: List[str], start_date: str, end_date: str) -> str:
-        multiday = "true" if start_date != end_date else "false"
-        depart_date_sec = end_date if multiday == "true" else start_date
-        
-        departure_str = ",".join(origins)
-        arrival_str = ",".join(destinations)
-
-        return (
-            f"https://www.pointsyeah.com/search?cabins=Economy%2CPremium+Economy%2CBusiness%2CFirst"
-            f"&cabin=Economy"
-            f"&banks=Amex%2CCapital+One%2CChase"
-            f"&airlineProgram=AR%2CAM%2CAC%2CKL%2CAS%2CAV%2CDL%2CEK%2CEY%2CAY%2CIB%2CB6%2CQF%2CSQ%2CTP%2CTK%2CUA%2CVS"
-            f"&tripType=1"
-            f"&adults=1"
-            f"&children=0"
-            f"&departure={departure_str}"
-            f"&arrival={arrival_str}"
-            f"&departDate={start_date}"
-            f"&departDateSec={depart_date_sec}"
-            f"&multiday={multiday}"
-        )
-
-    @staticmethod
-    @functools.lru_cache(maxsize=None)
-    def _normalize_program_name(program_name: Optional[str]) -> Optional[str]:
-        if not program_name:
-            return None
-        # The PROGRAM_MAPPING in this file is from code to name, so it's not
-        # suitable for normalizing names. The previous implementation had a bug
-        # where it would never find anything in the map.
-        # For now, we just strip whitespace. A more robust normalization could be
-        # implemented here if variations in program names are found.
-        return program_name.strip()
-
 import time
 async def main_test():
     """Test function to run the scraper for a sample search."""
@@ -557,7 +511,6 @@ async def main_test():
     try:
         scraper = await PointsYeahScraper.create()
         
-        # Define scrape jobs using the new structured format
         jobs = [
             {
                 "job_type": "matrix",
