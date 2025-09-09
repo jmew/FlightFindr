@@ -183,11 +183,11 @@ class PointsYeahScraper:
         
         page.on("response", handle_response)
 
+        search_url = self._build_matrix_url(origins, destinations, start_date, end_date)
         try:
-            search_url = self._build_matrix_url(origins, destinations, start_date, end_date)
             await page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
-            await asyncio.wait_for(search_done_future, timeout=120)
-            
+            await asyncio.wait_for(search_done_future, timeout=70)
+            print("MATRIX search complete, filtering results...")
             filtered_deals = {}
             for segments, (duration, program_options) in best_deals.items():
                 if not segments: continue
@@ -198,6 +198,11 @@ class PointsYeahScraper:
             return filtered_deals
         except Exception as e:
             print(f"An error occurred during matrix scraping: {e.__class__.__name__}: {e}")
+            print(f"Error accessing URL: {search_url}")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_path = f"error_screenshot_{timestamp}.png"
+            await page.screenshot(path=screenshot_path, full_page=True)
+            print(f"📸 Screenshot saved to {screenshot_path}")
             return {}
         finally:
             await page.close()
@@ -234,7 +239,7 @@ class PointsYeahScraper:
             search_url = self._build_multicity_url(leg1, leg2)
             await page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
             await asyncio.wait_for(search_done_future, timeout=120)
-            
+            print("MULTI-CITY search complete, filtering results...")
             return best_deals
         except Exception as e:
             print(f"An error occurred during multicity scraping: {e.__class__.__name__}: {e}")
@@ -525,10 +530,64 @@ async def main_test():
                 ]
             },
             {
-                "job_type": "multicity",
-                "leg1": {"origin": "LHR", "destination": "HKG", "start_date": "2025-11-01", "end_date": "2025-11-02"},
-                "leg2": {"origin": "HKG", "destination": "TPE", "start_date": "2025-11-15", "end_date": "2025-11-16"}
-            }
+                "job_type": "matrix",
+                "origins": ["LHR", "CDG"],
+                "destinations": ["BKK", "NRT", "ICN"],
+                "start_date": "2025-10-24",
+                "end_date": "2025-10-28",
+                "valid_routes": [
+                    ("LHR", "BKK"),
+                    ("LHR", "NRT"),
+                    ("CDG", "NRT"),
+                    ("CDG", "ICN")
+                ]
+            },
+            {
+                "job_type": "matrix",
+                "origins": ["YYZ"],
+                "destinations": ["YVR"],
+                "start_date": "2025-11-24",
+                "end_date": "2025-11-27",
+                "valid_routes": [
+                    ("YYZ", "YVR")
+                ]
+            },
+            {
+                "job_type": "matrix",
+                "origins": ["YYZ"],
+                "destinations": ["YVR"],
+                "start_date": "2025-12-24",
+                "end_date": "2025-12-27",
+                "valid_routes": [
+                    ("YYZ", "YVR")
+                ]
+            },
+            {
+                "job_type": "matrix",
+                "origins": ["YYZ"],
+                "destinations": ["YVR"],
+                "start_date": "2025-10-24",
+                "end_date": "2025-10-27",
+                "valid_routes": [
+                    ("YYZ", "YVR")
+                ]
+            },
+            {
+                "job_type": "matrix",
+                "origins": ["DXB"],
+                "destinations": ["HKG", "SIN"],
+                "start_date": "2025-12-24",
+                "end_date": "2025-12-28",
+                "valid_routes": [
+                    ("DXB", "HKG"),
+                    ("DXB", "SIN"),
+                ]
+            },
+            # {
+            #     "job_type": "multicity",
+            #     "leg1": {"origin": "LHR", "destination": "HKG", "start_date": "2025-11-01", "end_date": "2025-11-02"},
+            #     "leg2": {"origin": "HKG", "destination": "TPE", "start_date": "2025-11-15", "end_date": "2025-11-16"}
+            # }
         ]
 
         start_time = time.perf_counter()
@@ -549,8 +608,8 @@ async def main_test():
         duration = end_time - start_time
         print(f"The search took {duration} seconds.")
 
-        with open("deals.json", 'w') as f:
-            json.dump(deals_data, f, indent=2)
+        # with open("deals.json", 'w') as f:
+        #     json.dump(deals_data, f, indent=2)
 
     finally:
         if scraper:
