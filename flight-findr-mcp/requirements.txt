@@ -4,3 +4,4 @@ uvicorn
 fast-flights
 airportsdata
 google-search-results
+pytz
