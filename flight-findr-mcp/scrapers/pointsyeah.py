@@ -54,16 +54,13 @@ class PointsYeahScraper:
         if not self.browser:
             return json.dumps({"error": "Browser not initialized"})
 
-        # 1. Aggregate cash price searches from all jobs
+        # 1. SETUP cash price searches (no await)
         cash_price_tasks = []
         unique_cash_searches = set()
         for job in jobs:
             if job.get("job_type") == "matrix":
-                # For matrix, we need to get all combinations for cash prices
-                origins = job.get("origins", [])
-                destinations = job.get("destinations", [])
-                start_date_str = job.get("start_date")
-                end_date_str = job.get("end_date")
+                origins, destinations = job.get("origins", []), job.get("destinations", [])
+                start_date_str, end_date_str = job.get("start_date"), job.get("end_date")
                 for o in origins:
                     for d in destinations:
                         cash_search_tuple = (o, d, start_date_str, end_date_str)
@@ -78,48 +75,46 @@ class PointsYeahScraper:
                             cash_price_tasks.append(self._scrape_cash_prices(leg_data["origin"], leg_data["destination"], leg_data["start_date"], leg_data["end_date"]))
                             unique_cash_searches.add(cash_search_tuple)
 
-        all_cash_prices_results = await asyncio.gather(*cash_price_tasks, return_exceptions=True)
-        valid_cash_results = [r for r in all_cash_prices_results if not isinstance(r, Exception)]
+        # Helper function to encapsulate points scraping lifecycle
+        async def run_points_searches():
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            auth_file_path = os.path.join(script_dir, "auth_state.json")
+            context_options = {
+                "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+                "viewport": {'width': 1920, 'height': 1080}, "locale": 'en-US',
+                "timezone_id": 'America/New_York', "color_scheme": 'light',
+                "storage_state": auth_file_path
+            }
+            
+            CONCURRENCY_LIMIT = 3
+            contexts = [await self.browser.new_context(**context_options) for _ in range(CONCURRENCY_LIMIT)]
+            semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
-        # 2. Create and run points searches
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        auth_file_path = os.path.join(script_dir, "auth_state.json")
-        context_options = {
-            "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-            "viewport": {'width': 1920, 'height': 1080},
-            "locale": 'en-US',
-            "timezone_id": 'America/New_York',
-            "color_scheme": 'light',
-            "storage_state": auth_file_path
-        }
-        
-        CONCURRENCY_LIMIT = 3
-        contexts = [await self.browser.new_context(**context_options) for _ in range(CONCURRENCY_LIMIT)]
-        semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+            async def scrape_with_semaphore(context, job):
+                async with semaphore:
+                    job_type = job.get("job_type")
+                    if job_type == "matrix":
+                        return await self._scrape_matrix_search(context, job)
+                    elif job_type == "multicity":
+                        return await self._scrape_multicity_search(context, job)
+                    return {}
 
-        async def scrape_with_semaphore(context, job):
-            async with semaphore:
-                job_type = job.get("job_type")
-                if job_type == "matrix":
-                    return await self._scrape_matrix_search(context, job)
-                elif job_type == "multicity":
-                    return await self._scrape_multicity_search(context, job)
-                # Add other job types here in the future
-                return {}
+            try:
+                search_tasks = [scrape_with_semaphore(contexts[i % CONCURRENCY_LIMIT], job) for i, job in enumerate(jobs)]
+                return await asyncio.gather(*search_tasks, return_exceptions=True)
+            finally:
+                # Close all browser contexts concurrently and robustly.
+                await asyncio.gather(*(c.close() for c in contexts), return_exceptions=True)
 
-        search_tasks = []
-        for i, job in enumerate(jobs):
-            context_for_job = contexts[i % CONCURRENCY_LIMIT]
-            search_tasks.append(scrape_with_semaphore(context_for_job, job))
+        # 2. Create and run cash and points scraping tasks in parallel
+        cash_future = asyncio.gather(*cash_price_tasks, return_exceptions=True)
+        points_task = asyncio.create_task(run_points_searches())
         
-        results = await asyncio.gather(*search_tasks, return_exceptions=True)
-        
-        for context in contexts:
-            await context.close()
+        all_cash_prices_results, points_results = await asyncio.gather(cash_future, points_task)
 
         # 3. Process points results
         all_deals_dict: Dict[tuple, Tuple[int, dict]] = {}
-        for result in results:
+        for result in points_results:
             if isinstance(result, Exception):
                 print(f"A search task failed: {result}")
                 continue
@@ -128,13 +123,12 @@ class PointsYeahScraper:
                 if segments_key not in all_deals_dict:
                     all_deals_dict[segments_key] = (duration, {})
                 
-                existing_duration, existing_options = all_deals_dict[segments_key]
+                _, existing_options = all_deals_dict[segments_key]
 
                 for program_code, option_data in program_options.items():
                     if program_code not in existing_options:
                         existing_options[program_code] = option_data
                     else:
-                        # Merge cabins, keeping the cheaper one
                         existing_cabins = existing_options[program_code]['cabins']
                         new_cabins = option_data['cabins']
                         for cabin_code, cabin_deal in new_cabins.items():
@@ -142,6 +136,7 @@ class PointsYeahScraper:
                                 existing_cabins[cabin_code] = cabin_deal
         
         # 4. Match cash prices
+        valid_cash_results = [r for r in all_cash_prices_results if not isinstance(r, Exception)]
         self._match_cash_prices(all_deals_dict, valid_cash_results)
 
         # 5. Format and return
@@ -150,21 +145,17 @@ class PointsYeahScraper:
 
         final_deals = []
         for segments, (duration, program_options) in all_deals_dict.items():
-            options_list = []
-            for option_data in program_options.values():
-                options_list.append([
+            options_list = [
+                [
                     option_data['program'],
                     option_data['transfer_partners'],
                     option_data['url_params'],
                     option_data['cabins']
-                ])
+                ] for option_data in program_options.values()
+            ]
             final_deals.append([list(segments), options_list, duration])
 
-        result = {
-            "legend": self.LEGEND,
-            "deals": final_deals,
-        }
-
+        result = {"legend": self.LEGEND, "deals": final_deals}
         return json.dumps(result, indent=2)
 
     async def _scrape_matrix_search(self, context: Any, job: Dict[str, Any]) -> Dict[Any, Any]:
@@ -552,8 +543,12 @@ class PointsYeahScraper:
     def _normalize_program_name(program_name: Optional[str]) -> Optional[str]:
         if not program_name:
             return None
-        lower_program_name = program_name.strip().lower()
-        return PROGRAM_MAPPING.get(lower_program_name, program_name.strip())
+        # The PROGRAM_MAPPING in this file is from code to name, so it's not
+        # suitable for normalizing names. The previous implementation had a bug
+        # where it would never find anything in the map.
+        # For now, we just strip whitespace. A more robust normalization could be
+        # implemented here if variations in program names are found.
+        return program_name.strip()
 
 import time
 async def main_test():
