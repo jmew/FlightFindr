@@ -83,10 +83,10 @@ class PointsYeahScraper:
             "color_scheme": 'light',
             "storage_state": auth_file_path
         }
-        contexts = [await self.browser.new_context(**context_options) for _ in range(len(searches))]
+        context = await self.browser.new_context(**context_options)
         
-        search_tasks = []
-        for i, search in enumerate(searches):
+        search_args_list = []
+        for search in searches:
             origin = ",".join(search['origin_airports'])
             destination = ",".join(search['destination_airports'])
             start_date_str = search['start_date']
@@ -102,31 +102,27 @@ class PointsYeahScraper:
                     if current_end_date > end_date:
                         current_end_date = end_date
                     
-                    search_tasks.append(
-                        self._scrape_one_search(
-                            contexts[i % len(contexts)],
-                            origin,
-                            destination,
-                            current_start_date.strftime('%Y-%m-%d'),
-                            current_end_date.strftime('%Y-%m-%d')
-                        )
+                    search_args_list.append(
+                        (origin, destination, current_start_date.strftime('%Y-%m-%d'), current_end_date.strftime('%Y-%m-%d'))
                     )
                     current_start_date = current_end_date
             else:
-                search_tasks.append(
-                    self._scrape_one_search(
-                        contexts[i % len(contexts)],
-                        origin,
-                        destination,
-                        start_date_str,
-                        end_date_str
-                    )
+                search_args_list.append(
+                    (origin, destination, start_date_str, end_date_str)
                 )
+        
+        CONCURRENCY_LIMIT = 3
+        semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+
+        async def scrape_with_semaphore(origin, dest, start, end):
+            async with semaphore:
+                return await self._scrape_one_search(context, origin, dest, start, end)
+
+        search_tasks = [scrape_with_semaphore(origin, dest, start, end) for origin, dest, start, end in search_args_list]
         
         results = await asyncio.gather(*search_tasks, return_exceptions=True)
         
-        for context in contexts:
-            await context.close()
+        await context.close()
 
         # 3. Process points results
         all_deals_dict: Dict[tuple, Tuple[int, dict]] = {}
@@ -232,7 +228,7 @@ class PointsYeahScraper:
             search_url = self._build_search_url(origin, destination, start_date, end_date)
             asyncio.create_task(page.goto(search_url, timeout=90000, wait_until='domcontentloaded'))
 
-            await asyncio.wait_for(search_done_future, timeout=120)
+            await asyncio.wait_for(search_done_future, timeout=150)
             print("Search complete (detected 'done' signal).")
 
             filtered_deals = {}
@@ -246,7 +242,15 @@ class PointsYeahScraper:
 
         except asyncio.TimeoutError:
             print("Timed out waiting for the 'done' signal from the server.")
-            return {}
+            # there might be partial deals still that were parsed with the timeout, so use those partial data
+            filtered_deals = {}
+            for segments, (duration, program_options) in best_deals.items():
+                origin_code = segments[0][1]
+                dest_code = segments[-1][2]
+                if origin_code in origin and dest_code in destination:
+                    filtered_deals[segments] = (duration, program_options)
+
+            return filtered_deals
         except Exception as e:
             print(f"An error occurred during scraping: {e}")
             return {}
@@ -482,7 +486,7 @@ class PointsYeahScraper:
             f"https://www.pointsyeah.com/search?cabins=Economy%2CPremium+Economy%2CBusiness%2CFirst"
             f"&cabin=Economy"
             f"&banks=Amex%2CCapital+One%2CChase"
-            f"&airlineProgram=AR%2CAM%2CAC%2CKL%2CAS%2CAV%2CDL%2CEK%2CEY%2CAY%2CIB%2CB6%2CLH%2CQF%2CSK%2CSQ%2CNK%2CTP%2CTK%2CUA%2CVS%2CAA"
+            f"&airlineProgram=AR%2CAM%2CAC%2CKL%2CAS%2CAV%2CDL%2CEK%2CEY%2CAY%2CIB%2CB6%2CQF%2CSQ%2CTP%2CTK%2CUA%2CVS"
             f"&tripType=1"
             f"&adults=1"
             f"&children=0"
