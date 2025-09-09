@@ -1,10 +1,7 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 import asyncio
-import os
 from dotenv import load_dotenv
-from playwright.async_api import async_playwright
-import json
 from fast_flights import FlightData, Passengers, get_flights
 import fast_flights.core
 from . import custom_parser

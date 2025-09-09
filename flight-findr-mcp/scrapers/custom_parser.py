@@ -58,9 +58,6 @@ def parse_response(
                 if layover_node:
                     layover_info = layover_node.text(strip=True)
 
-            # --- Emissions and Delays ---
-            
-            # --- Amenities and Baggage ---
 
             # --- Flight Number from Emissions div ---
             flight_number = None

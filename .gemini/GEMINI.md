@@ -68,12 +68,17 @@ The `web-server` is a Node.js/Express application written in TypeScript. It foll
 
 #### Scraper (flight-findr-mcp) Architecture
 
-The `flight-findr-mcp` module is a Python-based scraper server that uses Playwright.
+The `flight-findr-mcp` module is a Python-based scraper server that uses Playwright. It has been architected for high efficiency by moving planning logic to the Gemini agent and allowing the scraper to focus purely on parallelized execution.
 
-*   **Single Scraper:** The project now exclusively uses the `PointsYeahScraper`. The `SeatsAeroScraper` has been removed to simplify the codebase.
-*   **Timezone-Aware Duration:** The flight duration is calculated in a timezone-aware manner in the backend using the `pytz` and `airportsdata` libraries. This ensures that the duration is accurate, regardless of the user's location.
-*   **Robust Program Identification:** The scraper now prioritizes the `code` field from the PointsYeah API to identify airline programs. This is more reliable than relying on string matching of program names.
-*   **Refactored Logic:** The `_process_deals` function in `pointsyeah.py` has been refactored into smaller, more focused helper functions (`_get_program_code`, `_calculate_duration`, `_extract_segments_data`, `_get_booking_option`) to improve readability and maintainability.
+*   **Unified Job-Based Architecture:** The scraper exposes a single, powerful tool (`check_flight_points_prices`) that accepts a list of structured "jobs." The Gemini agent acts as a smart planner, analyzing a user's request and breaking it down into an optimal combination of `matrix` and `multicity` jobs.
+
+*   **Parallel Execution:** The MCP server receives this list of jobs and executes them concurrently, using a pool of browser contexts to maximize parallelism and speed.
+
+*   **Matrix & Multi-City Searches:**
+    *   **Matrix:** This job type is used for searching many origins and destinations over a contiguous 5-day date range. The agent provides a list of `valid_routes` to ensure the scraper can filter the matrix results down to only the specific flights the user requested.
+    *   **Multi-City:** This job type is used to efficiently pair up two distinct flight legs into a single browser session.
+
+This separation of concerns (Agent plans, Tool executes) makes the system highly flexible and performant.
 
 #### PointsYeah Cash Price Matching
 
@@ -143,3 +148,10 @@ When committing changes, especially with multi-line commit messages, it's best t
 
 ### Last Notes
 Do not make any changes to the async main_test() function in pointsyeah.py unless instructed to do so
+
+Do not change the pointsyeah base url parameters from the following:
+
+&banks=Amex%2CCapital+One%2CChase
+&airlineProgram=AR%2CAM%2CAC%2CKL%2CAS%2CAV%2CDL%2CEK%2CEY%2CAY%2CIB%2CB6%2CQF%2CSQ%2CTP%2CTK%2CUA%2CVS
+
+If you make a change to the "memory" in sessionManager.ts , if you have a ` symbol, always escape it with a slash

@@ -5,14 +5,27 @@ from fastmcp import FastMCP
 from fastmcp.tools import Tool
 from scrapers.pointsyeah import PointsYeahScraper
 import json
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, ValidationError
 
-class FlightSearch(BaseModel):
-    origin_airports: List[str]
-    destination_airports: List[str]
+class MatrixJob(BaseModel):
+    job_type: str
+    origins: List[str]
+    destinations: List[str]
     start_date: str
     end_date: str
+    valid_routes: List[Tuple[str, str]]
+
+class MultiCityLeg(BaseModel):
+    origin: str
+    destination: str
+    start_date: str
+    end_date: str
+
+class MultiCityJob(BaseModel):
+    job_type: str
+    leg1: MultiCityLeg
+    leg2: MultiCityLeg
 
 class FlightSearchMCP(FastMCP):
     def __init__(self):
@@ -21,55 +34,54 @@ class FlightSearchMCP(FastMCP):
         
         self.add_tool(Tool.from_function(
             self.check_flight_points_prices,
-            description="""Finds the best flight deals using points and cash from various sources. It accepts the following schema:
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "searches": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "origin_airports": {
-                                        "type": "array",
-                                        "items": {"type": "string"}
-                                    },
-                                    "destination_airports": {
-                                        "type": "array",
-                                        "items": {"type": "string"}
-                                    },
-                                    "start_date": {"type": "string"},
-                                    "end_date": {"type": "string"}
-                                },
-                                "required": ["origin_airports", "destination_airports", "start_date", "end_date"]
-                            }
-                        }
-                    },
-                    "required": ["searches"]
-                }
+            description="""Finds flight deals. Accepts a list of "jobs" to run in parallel.
+
+Schema for a 'matrix' job (many origins/destinations in one date range):
+{
+  "job_type": "matrix",
+  "origins": ["SEA", "JFK"],
+  "destinations": ["LHR", "CDG"],
+  "start_date": "2025-10-20",
+  "end_date": "2025-10-24",
+  "valid_routes": [["SEA", "LHR"], ["JFK", "CDG"]]
+}
+
+Schema for a 'multicity' job (two distinct legs):
+{
+  "job_type": "multicity",
+  "leg1": {"origin": "LHR", "destination": "HKG", "start_date": "2025-11-01", "end_date": "2025-11-02"},
+  "leg2": {"origin": "HKG", "destination": "TPE", "start_date": "2025-11-15", "end_date": "2025-11-16"}
+}
             """,
         ))
 
     async def check_flight_points_prices(
         self,
-        searches: List[Dict[str, Any]],
+        jobs: List[Dict[str, Any]],
     ) -> str:
         """
-        Checks for flight points prices across different platforms for a list of searches.
+        Executes a list of flight search jobs in parallel.
         """
         if not self.scraper:
             return json.dumps({"error": "Scraper not initialized"})
         
-        if not isinstance(searches, list):
-             return json.dumps({"error": "Invalid input, 'searches' must be a list of search objects."})
+        if not isinstance(jobs, list):
+             return json.dumps({"error": "Invalid input, 'jobs' must be a list of job objects."})
 
         try:
             # Validate input with Pydantic
-            validated_searches = [FlightSearch(**search) for search in searches]
-            search_dicts = [search.dict() for search in validated_searches]
-            return await self.scraper.search_flights(search_dicts)
-        except ValidationError as e:
-            return json.dumps({"error": f"Invalid search object: {e}"})
+            validated_jobs = []
+            for job in jobs:
+                if job.get("job_type") == "matrix":
+                    validated_jobs.append(MatrixJob(**job).dict())
+                elif job.get("job_type") == "multicity":
+                    validated_jobs.append(MultiCityJob(**job).dict())
+                else:
+                    raise ValueError(f"Unknown job_type: {job.get('job_type')}")
+            
+            return await self.scraper.search_flights(validated_jobs)
+        except (ValidationError, ValueError) as e:
+            return json.dumps({"error": f"Invalid job object: {e}"})
 
 mcp_server = FlightSearchMCP()
 
