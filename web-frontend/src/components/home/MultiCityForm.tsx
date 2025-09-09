@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaPlaneDeparture, FaPlaneArrival, FaCalendarAlt, FaClock, FaCity, FaPlus, FaTrash } from 'react-icons/fa';
 import { Form, Button, Row, Col, InputGroup } from 'react-bootstrap';
 import styles from './WelcomeScreen.module.css';
@@ -20,11 +20,32 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
   const [startDateType, setStartDateType] = useState('text');
   const [endDateType, setEndDateType] = useState('text');
 
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const endDateRef = useRef<HTMLInputElement>(null);
+
+  const [maxEndDate, setMaxEndDate] = useState('');
+
   useEffect(() => {
     if (isRoundTrip) {
       setEndLocation(startLocation);
     }
   }, [isRoundTrip, startLocation]);
+
+  useEffect(() => {
+    if (startDate) {
+      const start = new Date(startDate);
+      const maxDate = new Date(start.getTime() + 28 * 24 * 60 * 60 * 1000); // 28 days later
+      const formattedMaxDate = maxDate.toISOString().split('T')[0];
+      setMaxEndDate(formattedMaxDate);
+
+      // If endDate is beyond the new maxDate, adjust it
+      if (endDate && endDate > formattedMaxDate) {
+        setEndDate(formattedMaxDate);
+      }
+    } else {
+      setMaxEndDate(''); // Clear maxEndDate if startDate is cleared
+    }
+  }, [startDate, endDate]);
 
   const handleAddStop = () => {
     setIntermediateStops([...intermediateStops, '']);
@@ -96,7 +117,7 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
       <Form.Group className="mb-3">
         <Form.Check 
           type="checkbox"
-          label="Round trip"
+          label="I want my last flight to return back to where I started"
           id="round-trip-checkbox"
           checked={isRoundTrip}
           onChange={(e) => setIsRoundTrip(e.target.checked)}
@@ -128,7 +149,7 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
 
       <Row className="mb-3">
         <Col xs={12}>
-          <Button variant="outline-primary" size="sm" onClick={handleAddStop}>
+          <Button variant="outline-primary" size="sm" onClick={handleAddStop} disabled={intermediateStops.length >= 6}>
             <FaPlus /> Add stop
           </Button>
         </Col>
@@ -140,13 +161,17 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
             <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
             <Form.Control
               type={startDateType}
-              onFocus={() => setStartDateType('date')}
+              onFocus={() => {
+                setStartDateType('date');
+                startDateRef.current?.showPicker();
+              }}
               onBlur={() => !startDate && setStartDateType('text')}
               placeholder="Start date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               required
               className={styles.formControl}
+              ref={startDateRef}
             />
           </InputGroup>
         </Col>
@@ -155,14 +180,19 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
             <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
             <Form.Control
               type={endDateType}
-              onFocus={() => setEndDateType('date')}
+              onFocus={() => {
+                setEndDateType('date');
+                endDateRef.current?.showPicker();
+              }}
               onBlur={() => !endDate && setEndDateType('text')}
               placeholder="End date"
               min={startDate}
+              max={maxEndDate}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               required
               className={styles.formControl}
+              ref={endDateRef}
             />
           </InputGroup>
         </Col>
