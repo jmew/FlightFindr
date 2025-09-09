@@ -15,8 +15,10 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
   const [endDate, setEndDate] = useState('');
   const [maxLength, setMaxLength] = useState('');
   const [constraints, setConstraints] = useState('');
-  const [flexible, setFlexible] = useState(false);
+  const [flexible, setFlexible] = useState(true);
   const [isRoundTrip, setIsRoundTrip] = useState(true);
+  const [startDateType, setStartDateType] = useState('text');
+  const [endDateType, setEndDateType] = useState('text');
 
   useEffect(() => {
     if (isRoundTrip) {
@@ -134,7 +136,10 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
           <InputGroup>
             <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
             <Form.Control
-              type="date"
+              type={startDateType}
+              onFocus={() => setStartDateType('date')}
+              onBlur={() => !startDate && setStartDateType('text')}
+              placeholder="Start date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               required
@@ -146,7 +151,11 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
           <InputGroup>
             <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
             <Form.Control
-              type="date"
+              type={endDateType}
+              onFocus={() => setEndDateType('date')}
+              onBlur={() => !endDate && setEndDateType('text')}
+              placeholder="End date"
+              min={startDate}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               required

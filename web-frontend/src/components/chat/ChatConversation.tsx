@@ -46,6 +46,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   const isChatEmpty = messages.length === 0;
   const [placeholder, setPlaceholder] = useState('');
   const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState('single-flight');
 
   useEffect(() => {
     // Prevent body scroll on mobile when the welcome screen is visible.
@@ -93,7 +94,11 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
 
   return (
     <div className={`${styles.mainContent} ${isChatEmpty ? styles.emptyChat : ''}`}>
-      <WelcomeScreen handleSendMessage={handleSuggestionClick} isChatEmpty={isChatEmpty} />
+      <WelcomeScreen
+        handleSendMessage={handleSuggestionClick}
+        isChatEmpty={isChatEmpty}
+        onTabSelect={setActiveTab}
+      />
       {!isChatEmpty && (
         <div className={styles.chatConversation}>
           <MessageList
@@ -105,44 +110,46 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
           />
         </div>
       )}
-      <div className={styles.inputArea}>
-        <form className={styles.inputForm} onSubmit={handleFormSubmit}>
-          <input
-            type="text"
-            className={styles.inputField}
-            placeholder={
-              isChatEmpty
-                ? placeholder
-                : "Tell me where you'd like to fly to"
-            }
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-          />
-          {isLoading ? (
-            <button
-              type="button"
-              className={styles.stopButton}
-              onClick={handleStop}
-            >
-              <FiSquare className={styles.sendIcon} />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              className={styles.sendButton}
-              disabled={!input.trim()}
-            >
-              <FiSend className={styles.sendIcon} />
-            </button>
+      {!(isChatEmpty && activeTab === 'multi-city') && (
+        <div className={styles.inputArea}>
+          <form className={styles.inputForm} onSubmit={handleFormSubmit}>
+            <input
+              type="text"
+              className={styles.inputField}
+              placeholder={
+                isChatEmpty
+                  ? placeholder
+                  : "Tell me where you'd like to fly to"
+              }
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+            {isLoading ? (
+              <button
+                type="button"
+                className={styles.stopButton}
+                onClick={handleStop}
+              >
+                <FiSquare className={styles.sendIcon} />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className={styles.sendButton}
+                disabled={!input.trim()}
+              >
+                <FiSend className={styles.sendIcon} />
+              </button>
+            )}
+          </form>
+          {isChatEmpty && (
+            <SuggestionBubbles
+              suggestions={suggestionBubbles}
+              onSuggestionClick={handleSuggestionClick}
+            />
           )}
-        </form>
-        {isChatEmpty && (
-          <SuggestionBubbles
-            suggestions={suggestionBubbles}
-            onSuggestionClick={handleSuggestionClick}
-          />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
