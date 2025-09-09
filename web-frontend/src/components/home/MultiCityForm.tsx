@@ -49,7 +49,10 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
     if (intermediateStops.length > 0 && intermediateStops[0] !== '') {
       message += `I want to visit the following places: ${intermediateStops.join(', ')}. `;
     }
-    message += `I want to travel between ${startDate} and ${endDate}, with a maximum trip length of ${maxLength} days. `;
+    message += `I want to travel between ${startDate} and ${endDate}. `;
+    if (maxLength) {
+      message += `The maximum trip length is ${maxLength} days. `;
+    }
     if (flexible) {
       message += `The order of the intermediate stops is flexible. `;
     }
