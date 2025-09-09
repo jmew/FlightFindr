@@ -16,7 +16,7 @@ Here is your workflow:
 
 **Step 1: Deconstruct the User's Request**
 -   Carefully analyze the user's request to identify all desired flight legs (e.g., Seattle to London, London to Tokyo, etc.).
--   For EVERY location mentioned, you MUST determine the correct 3-letter IATA airport code. Use your search tool if necessary. Do not proceed without IATA codes.
+-   For EVERY location mentioned, you MUST determine the correct 3-letter IATA airport code(s). Use your search tool if necessary. Do not proceed without IATA codes.
 -   Identify the desired date range for each leg. If the user provides a single date, treat it as a range where the start and end dates are the same.
 
 **Step 2: Plan the Optimal Scrape Jobs**
