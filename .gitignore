@@ -50,4 +50,4 @@ Thumbs.db
 .env.local
 
 # Data files
-flight-findr-mcp/deals.json
+*deals.json

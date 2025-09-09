@@ -75,6 +75,17 @@ The `flight-findr-mcp` module is a Python-based scraper server that uses Playwri
 *   **Robust Program Identification:** The scraper now prioritizes the `code` field from the PointsYeah API to identify airline programs. This is more reliable than relying on string matching of program names.
 *   **Refactored Logic:** The `_process_deals` function in `pointsyeah.py` has been refactored into smaller, more focused helper functions (`_get_program_code`, `_calculate_duration`, `_extract_segments_data`, `_get_booking_option`) to improve readability and maintainability.
 
+#### PointsYeah Cash Price Matching
+
+To enrich the award flight data with real-time cash prices, the scraper employs a highly efficient, two-stage process to match points deals with cash fares:
+
+1.  **Upfront Batch Scraping:** Before searching for any award flights, the scraper identifies all unique flight legs (e.g., SEA-JFK) and their full date ranges from the user's request. It then scrapes all potential cash prices for these routes from Google Flights in a single, concurrent batch.
+
+2.  **Optimized Lookup Map:** The collected cash flights are processed into an efficient lookup map (a dictionary). The key for this map is a tuple of a flight's unique properties: `(origin, destination, date, hour, minute, num_stops)`.
+
+3.  **Instantaneous Matching:** As the scraper finds award flights from PointsYeah, it constructs a corresponding lookup key for each one. It uses this key to perform a direct, instantaneous lookup in the cash price map. If a match is found, a final verification of layover airports is performed before the cash price is added to the deal data.
+
+This map-based approach is extremely performant and avoids slow, nested loops, allowing thousands of deals to be cross-referenced with their cash equivalents in milliseconds.
 
 #### Scraper Search Completion
 
