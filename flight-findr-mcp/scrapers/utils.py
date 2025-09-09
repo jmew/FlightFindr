@@ -107,8 +107,35 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
 
     async def search_single_flight(origin_airport, dest_airport, date):
         async with semaphore:
+            max_fallback_retries = 3
+            
+            # Retry loop for 'fallback'
+            for attempt in range(max_fallback_retries):
+                try:
+                    result = await asyncio.to_thread(
+                        get_flights,
+                        flight_data=[
+                            FlightData(date=date, from_airport=origin_airport, to_airport=dest_airport)
+                        ],
+                        trip="one-way",
+                        seat=cabin,
+                        passengers=Passengers(adults=1, children=0, infants_in_seat=0, infants_on_lap=0),
+                        fetch_mode="fallback",
+                    )
+                    flights_with_date = []
+                    for flight in result.flights:
+                        flight_dict = flight.__dict__
+                        flight_dict['date'] = date
+                        flights_with_date.append(flight_dict)
+                    return flights_with_date # Success
+                except Exception as e:
+                    print(f"Attempt {attempt + 1} (fallback) failed for {origin_airport}->{dest_airport} on {date}: {e}")
+                    if attempt < max_fallback_retries - 1:
+                        await asyncio.sleep(1) # wait before next retry
+            
+            # If all fallback attempts failed, try with 'local'
+            print(f"All fallback attempts failed. Trying with local for {origin_airport}->{dest_airport} on {date}")
             try:
-                # First attempt with fallback
                 result = await asyncio.to_thread(
                     get_flights,
                     flight_data=[
@@ -117,7 +144,7 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
                     trip="one-way",
                     seat=cabin,
                     passengers=Passengers(adults=1, children=0, infants_in_seat=0, infants_on_lap=0),
-                    fetch_mode="fallback",
+                    fetch_mode="local",
                 )
                 flights_with_date = []
                 for flight in result.flights:
@@ -126,27 +153,8 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
                     flights_with_date.append(flight_dict)
                 return flights_with_date
             except Exception as e:
-                if "no token provided" in str(e):
-                    print(f"Rate limit error for {origin_airport}->{dest_airport} on {date}. Retrying with local Playwright...")
-                    try:
-                        # Retry with local
-                        result = await asyncio.to_thread(
-                            get_flights,
-                            flight_data=[
-                                FlightData(date=date, from_airport=origin_airport, to_airport=dest_airport)
-                            ],
-                            trip="one-way",
-                            seat=cabin,
-                            passengers=Passengers(adults=1, children=0, infants_in_seat=0, infants_on_lap=0),
-                            fetch_mode="local",
-                        )
-                        return [flight.__dict__ for flight in result.flights]
-                    except Exception as e2:
-                        print(f"Error getting cash price with local Playwright for {origin_airport} -> {dest_airport} on {date} ({cabin}): {e2}")
-                        return []
-                else:
-                    print(f"Error getting cash price for {origin_airport} -> {dest_airport} on {date} ({cabin}): {e}")
-                    return []
+                print(f"Final attempt (local) failed for {origin_airport} -> {dest_airport} on {date} ({cabin}): {e}")
+                return []
 
     tasks = [search_single_flight(o, d, dt) for o, d, dt in search_combinations]
     all_flights_lists = await asyncio.gather(*tasks)
