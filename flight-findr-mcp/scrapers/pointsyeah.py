@@ -1,6 +1,7 @@
 import os
 import sys
 from playwright.async_api import async_playwright, Browser, Playwright
+from playwright_stealth import Stealth
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
@@ -27,12 +28,7 @@ class PointsYeahScraper:
         self.CABIN_CODES_REVERSE = {v: k for k, v in self.LEGEND["cabin_codes"].items()}
         self.airports = airportsdata.load('IATA')
 
-    @classmethod
-    async def create(cls, headless: bool = True):
-        playwright = await async_playwright().start()
-        scraper = cls(playwright, headless)
-        await scraper.start()
-        return scraper
+    # The 'create' classmethod is no longer needed with the new structure.
 
     async def start(self):
         self.browser = await self.playwright.chromium.launch(
@@ -50,8 +46,7 @@ class PointsYeahScraper:
         print("Closing browser...")
         if self.browser:
             await self.browser.close()
-        if self.playwright:
-            await self.playwright.stop()
+        # No need to stop playwright here, 'async with' handles it.
 
     async def search_flights(self, jobs: List[Dict[str, Any]]) -> str:
         if not self.browser:
@@ -188,7 +183,7 @@ class PointsYeahScraper:
         search_url = self._build_matrix_url(origins, destinations, start_date, end_date)
         try:
             await page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
-            await asyncio.wait_for(search_done_future, timeout=70)
+            await asyncio.wait_for(search_done_future, timeout=90)
             print("MATRIX search complete, filtering results...")
             filtered_deals = {}
             for segments, (duration, program_options) in best_deals.items():
@@ -515,107 +510,110 @@ import time
 async def main_test():
     """Test function to run the scraper for a sample search."""
     scraper = None
-    try:
-        scraper = await PointsYeahScraper.create()
-        
-        jobs = [
-            {
-                "job_type": "matrix",
-                "origins": ["SEA", "JFK", "SFO"],
-                "destinations": ["LHR", "CDG"],
-                "start_date": "2025-10-20",
-                "end_date": "2025-10-24",
-                "valid_routes": [
-                    ("SEA", "LHR"),
-                    ("JFK", "LHR"),
-                    ("SFO", "CDG")
-                ]
-            },
-            # {
-            #     "job_type": "matrix",
-            #     "origins": ["LHR", "CDG"],
-            #     "destinations": ["BKK", "NRT", "ICN"],
-            #     "start_date": "2025-10-24",
-            #     "end_date": "2025-10-28",
-            #     "valid_routes": [
-            #         ("LHR", "BKK"),
-            #         ("LHR", "NRT"),
-            #         ("CDG", "NRT"),
-            #         ("CDG", "ICN")
-            #     ]
-            # },
-            # {
-            #     "job_type": "matrix",
-            #     "origins": ["YYZ"],
-            #     "destinations": ["YVR"],
-            #     "start_date": "2025-11-24",
-            #     "end_date": "2025-11-27",
-            #     "valid_routes": [
-            #         ("YYZ", "YVR")
-            #     ]
-            # },
-            # {
-            #     "job_type": "matrix",
-            #     "origins": ["YYZ"],
-            #     "destinations": ["YVR"],
-            #     "start_date": "2025-12-24",
-            #     "end_date": "2025-12-27",
-            #     "valid_routes": [
-            #         ("YYZ", "YVR")
-            #     ]
-            # },
-            # {
-            #     "job_type": "matrix",
-            #     "origins": ["YYZ"],
-            #     "destinations": ["YVR"],
-            #     "start_date": "2025-10-24",
-            #     "end_date": "2025-10-27",
-            #     "valid_routes": [
-            #         ("YYZ", "YVR")
-            #     ]
-            # },
-            # {
-            #     "job_type": "matrix",
-            #     "origins": ["DXB"],
-            #     "destinations": ["HKG", "SIN"],
-            #     "start_date": "2025-12-24",
-            #     "end_date": "2025-12-28",
-            #     "valid_routes": [
-            #         ("DXB", "HKG"),
-            #         ("DXB", "SIN"),
-            #     ]
-            # },
-            # {
-            #     "job_type": "multicity",
-            #     "leg1": {"origin": "LHR", "destination": "HKG", "start_date": "2025-11-01", "end_date": "2025-11-02"},
-            #     "leg2": {"origin": "HKG", "destination": "TPE", "start_date": "2025-11-15", "end_date": "2025-11-16"}
-            # }
-        ]
+    # Correctly initialize playwright with stealth
+    async with Stealth().use_async(async_playwright()) as p:
+        try:
+            scraper = PointsYeahScraper(p)
+            await scraper.start()
+            
+            jobs = [
+                {
+                    "job_type": "matrix",
+                    "origins": ["SEA", "JFK", "SFO"],
+                    "destinations": ["LHR", "CDG"],
+                    "start_date": "2025-10-20",
+                    "end_date": "2025-10-24",
+                    "valid_routes": [
+                        ("SEA", "LHR"),
+                        ("JFK", "LHR"),
+                        ("SFO", "CDG")
+                    ]
+                },
+                {
+                    "job_type": "matrix",
+                    "origins": ["LHR", "CDG"],
+                    "destinations": ["BKK", "NRT", "ICN"],
+                    "start_date": "2025-10-24",
+                    "end_date": "2025-10-28",
+                    "valid_routes": [
+                        ("LHR", "BKK"),
+                        ("LHR", "NRT"),
+                        ("CDG", "NRT"),
+                        ("CDG", "ICN")
+                    ]
+                },
+                {
+                    "job_type": "matrix",
+                    "origins": ["YYZ"],
+                    "destinations": ["YVR"],
+                    "start_date": "2025-11-24",
+                    "end_date": "2025-11-27",
+                    "valid_routes": [
+                        ("YYZ", "YVR")
+                    ]
+                },
+                {
+                    "job_type": "matrix",
+                    "origins": ["YYZ"],
+                    "destinations": ["YVR"],
+                    "start_date": "2025-12-24",
+                    "end_date": "2025-12-27",
+                    "valid_routes": [
+                        ("YYZ", "YVR")
+                    ]
+                },
+                {
+                    "job_type": "matrix",
+                    "origins": ["YYZ"],
+                    "destinations": ["YVR"],
+                    "start_date": "2025-10-24",
+                    "end_date": "2025-10-27",
+                    "valid_routes": [
+                        ("YYZ", "YVR")
+                    ]
+                },
+                {
+                    "job_type": "matrix",
+                    "origins": ["DXB"],
+                    "destinations": ["HKG", "SIN"],
+                    "start_date": "2025-12-24",
+                    "end_date": "2025-12-28",
+                    "valid_routes": [
+                        ("DXB", "HKG"),
+                        ("DXB", "SIN"),
+                    ]
+                },
+                # {
+                #     "job_type": "multicity",
+                #     "leg1": {"origin": "LHR", "destination": "HKG", "start_date": "2025-11-01", "end_date": "2025-11-02"},
+                #     "leg2": {"origin": "HKG", "destination": "TPE", "start_date": "2025-11-15", "end_date": "2025-11-16"}
+                # }
+            ]
 
-        start_time = time.perf_counter()
-        deals_json = await scraper.search_flights(jobs)
-        
-        deals_data = json.loads(deals_json)
-        print(f"Found {len(deals_data.get('deals', []))} deals.")
-        end_time = time.perf_counter()
-        
-        flight_count = 0
-        for deal in deals_data.get('deals', []):
-            options = deal[1]
-            for option in options:
-                cabins = option[3]
-                flight_count += len(cabins)
-        print(f"Found {flight_count} individual flight options.")
+            start_time = time.perf_counter()
+            deals_json = await scraper.search_flights(jobs)
+            
+            deals_data = json.loads(deals_json)
+            print(f"Found {len(deals_data.get('deals', []))} deals.")
+            end_time = time.perf_counter()
+            
+            flight_count = 0
+            for deal in deals_data.get('deals', []):
+                options = deal[1]
+                for option in options:
+                    cabins = option[3]
+                    flight_count += len(cabins)
+            print(f"Found {flight_count} individual flight options.")
 
-        duration = end_time - start_time
-        print(f"The search took {duration} seconds.")
+            duration = end_time - start_time
+            print(f"The search took {duration} seconds.")
 
-        # with open("deals.json", 'w') as f:
-        #     json.dump(deals_data, f, indent=2)
+            # with open("deals.json", 'w') as f:
+            #     json.dump(deals_data, f, indent=2)
 
-    finally:
-        if scraper:
-            await scraper.close()
+        finally:
+            if scraper:
+                await scraper.close()
 
 if __name__ == '__main__':
     asyncio.run(main_test())
