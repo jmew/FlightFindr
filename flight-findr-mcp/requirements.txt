@@ -5,3 +5,4 @@ fast-flights
 airportsdata
 google-search-results
 pytz
+fake-useragent
