@@ -8,6 +8,7 @@ from . import custom_parser
 from . import custom_schema
 import fast_flights.schema
 import itertools
+import random
 
 # Load environment variables from .env file
 load_dotenv()
@@ -98,7 +99,7 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
     search_combinations = list(itertools.product(origins, destinations, dates))
     
     # Limit concurrency to 5 to avoid overwhelming the local Playwright
-    semaphore = asyncio.Semaphore(10)
+    semaphore = asyncio.Semaphore(5)
 
     async def search_single_flight(origin_airport, dest_airport, date):
         async with semaphore:
@@ -125,7 +126,8 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
                     return flights_with_date # Success
                 except Exception:
                     if attempt < max_fallback_retries - 1:
-                        await asyncio.sleep(1) # wait before next retry
+                        wait_time = (2 ** attempt) + random.uniform(0, 1)
+                        await asyncio.sleep(wait_time) # wait before next retry
             
             # If all fallback attempts failed, try with 'local'
             print(f"All fallback attempts failed. Trying with local for {origin_airport}->{dest_airport} on {date}")
