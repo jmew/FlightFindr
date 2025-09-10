@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { getOrCreateClient } from '../services/sessionManager.js';
-import { streamGeminiResponse } from '../utils/gemini-streamer.js';
+import { streamGeminiResponse, sendSseMessage } from '../utils/gemini-streamer.js';
 
 export async function multiCityHandler(req: Request, res: Response) {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -45,6 +45,8 @@ export async function multiCityHandler(req: Request, res: Response) {
     console.error('Error processing multi-city request:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'An unknown error occurred.';
-    res.status(500).json({ error: errorMessage });
+    sendSseMessage(res, 'error', { error: errorMessage });
+  } finally {
+    res.end();
   }
 }
