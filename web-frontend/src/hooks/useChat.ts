@@ -31,6 +31,9 @@ export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const isLoadingRef = useRef(isLoading);
+  isLoadingRef.current = isLoading;
+
   const [thought, setThought] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -46,6 +49,10 @@ export function useChat() {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
+      if (sessionIdRef.current && isLoading) {
+        // If we were in the middle of a stream, notify the server to cancel.
+        fetch(`/api/cancel?sessionId=${sessionIdRef.current}`).catch(console.error);
+      }
     }
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -98,6 +105,9 @@ export function useChat() {
     let botMessageIndex = -1;
 
     const onMessage = (event: any) => {
+      if (event.event === 'keep-alive') {
+        return; // Ignore keep-alive messages
+      }
       const data = JSON.parse(event.data);
       switch (event.event) {
         case 'content':
@@ -188,6 +198,9 @@ export function useChat() {
 
     const onStop = () => stopStreaming();
     const onError = (err: any) => {
+      if (!isLoadingRef.current) {
+        return;
+      }
       console.error('EventSource failed:', err);
       setMessages((prev) => [...prev, { sender: 'bot', text: 'An unexpected error occurred. Please check the console for details.' }]);
       stopStreaming();

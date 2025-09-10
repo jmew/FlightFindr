@@ -2,14 +2,12 @@ import {
   AuthType,
   Config,
   type ConfigParameters,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_EMBEDDING_MODEL,
+  DEFAULT_GEMINI_MODEL,
   ApprovalMode,
 } from '@google/gemini-cli-core';
 
-const today = new Date().toLocaleDateString('en-US');
 const memory = `
-Today's date is ${today}. You are a highly intelligent AI travel agent. Your goal is to help users plan complex, multi-city trips by finding the best flight deals. You have access to a powerful, unified flight search tool that can execute different types of search "jobs" in parallel.
+You are a highly intelligent AI travel agent. Your goal is to help users plan complex, multi-city trips by finding the best flight deals. You have access to a powerful, unified flight search tool that can execute different types of search "jobs" in parallel.
 
 Your primary responsibility is to be a **smart planner**. You must deconstruct the user's request into the most efficient set of jobs for the tool to execute. A key part of your role is to handle ambiguous requests, such as when a user provides a wide date range and asks you to find the 'best' dates.
 
@@ -52,6 +50,7 @@ Here is your workflow:
             -   Stay in LON on Oct 28, 29.
             -   Leg 3 (LHR -> SEA): Search Oct 30-31.
     -   **Result:** You now have 6 specific, small date-range searches to perform. You will group these into 'multicity' jobs in the next step.
+    -   Tell the user the potential itineraries you are searching, so they understand how you are optimizing the search.
 
 **Step 3: Structure the Tool Jobs**
 -   You should prefer fewer, larger 'matrix' jobs over many smaller jobs where possible.
@@ -98,15 +97,29 @@ Here is your workflow:
 -   If you performed a discovery search (Step 2.5), state this clearly. For example: "To find the best deals within your travel window, I searched a few potential itineraries. The best value seems to be for a trip starting around [date]..."
 -   Present the top 3 suggested itineraries to the user in a clear, easy-to-read format.
 -   Inform the user that you have analyzed many flight combinations and can answer follow-up questions to fine-tune the plans.
+
+**Other Notes**
+-   If you are unable to discover or connect to the Flight Deal Finder MCP server or the check_flight_points_prices tool, inform the user that the flight search functionality is currently unavailable.
 `
 
 type GeminiClient = ReturnType<Config['getGeminiClient']>;
-const sessions = new Map<string, { config: Config; client: GeminiClient }>();
+const sessions = new Map<string, { 
+  config: Config; 
+  client: GeminiClient; 
+  abortController: AbortController | null; 
+}>();
+
+export function getSession(sessionId: string) {
+  return sessions.get(sessionId);
+}
 
 export async function getOrCreateClient(sessionId: string) {
   if (sessions.has(sessionId)) {
     console.log(`Reusing Gemini client for session: ${sessionId}`);
-    return sessions.get(sessionId)!;
+    const session = sessions.get(sessionId)!;
+    // Create a new abort controller for the new request, but keep the old config/client
+    session.abortController = new AbortController();
+    return session;
   }
 
   console.log(`Initializing Gemini client for session: ${sessionId}`);
@@ -115,8 +128,7 @@ export async function getOrCreateClient(sessionId: string) {
 
   const configParams: ConfigParameters = {
     sessionId,
-    model: DEFAULT_GEMINI_FLASH_MODEL,
-    embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
+    model: DEFAULT_GEMINI_MODEL,
     targetDir: process.cwd(),
     cwd: process.cwd(),
     debugMode: false,
@@ -145,7 +157,7 @@ export async function getOrCreateClient(sessionId: string) {
   const client = config.getGeminiClient();
   console.log(`Gemini client initialized for session: ${sessionId}`);
 
-  const sessionData = { config, client };
+  const sessionData = { config, client, abortController: new AbortController() };
   sessions.set(sessionId, sessionData);
   return sessionData;
 }
