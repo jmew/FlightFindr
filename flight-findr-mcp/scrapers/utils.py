@@ -3,10 +3,6 @@ from typing import Optional, List, Dict, Any
 import asyncio
 from dotenv import load_dotenv
 from fast_flights import FlightData, Passengers, get_flights
-import fast_flights.core
-from . import custom_parser
-from . import custom_schema
-import fast_flights.schema
 import itertools
 import random
 
@@ -84,10 +80,6 @@ def parse_time(time_str: str) -> Optional[datetime.time]:
     except ValueError:
         return None
 
-# Set the custom parser
-fast_flights.core.parse_response = custom_parser.parse_response
-fast_flights.schema.Flight = custom_schema.Flight
-
 async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cabin: str) -> Dict[str, Any]:
     """Fetches cash prices for given routes and cabin across multiple dates in parallel using fast_flights."""
     print(f"Fetching cash prices for {origin} -> {destination} (Cabin: {cabin}) on dates: {', '.join(dates)}")
@@ -103,10 +95,8 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
 
     async def search_single_flight(origin_airport, dest_airport, date):
         async with semaphore:
-            max_fallback_retries = 3
-            
-            # Retry loop for 'fallback'
-            for attempt in range(max_fallback_retries):
+            max_retries = 3
+            for attempt in range(max_retries):
                 try:
                     result = await asyncio.to_thread(
                         get_flights,
@@ -116,7 +106,6 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
                         trip="one-way",
                         seat=cabin,
                         passengers=Passengers(adults=1, children=0, infants_in_seat=0, infants_on_lap=0),
-                        fetch_mode="fallback",
                     )
                     flights_with_date = []
                     for flight in result.flights:
@@ -124,33 +113,18 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
                         flight_dict['date'] = date
                         flights_with_date.append(flight_dict)
                     return flights_with_date # Success
-                except Exception:
-                    if attempt < max_fallback_retries - 1:
+                except Exception as e:
+                    print(f"Attempt {attempt + 1} failed for {origin_airport} -> {dest_airport} on {date} ({cabin}): {e}")
+                    if "No flights found in HTML content" in str(e):
+                        # This is an expected outcome for some routes, not an error to retry.
+                        return [] # Stop retrying and return empty list.
+
+                    if attempt < max_retries - 1:
                         wait_time = (2 ** attempt) + random.uniform(0, 1)
                         await asyncio.sleep(wait_time) # wait before next retry
-            
-            # If all fallback attempts failed, try with 'local'
-            print(f"All fallback attempts failed. Trying with local for {origin_airport}->{dest_airport} on {date}")
-            try:
-                result = await asyncio.to_thread(
-                    get_flights,
-                    flight_data=[
-                        FlightData(date=date, from_airport=origin_airport, to_airport=dest_airport)
-                    ],
-                    trip="one-way",
-                    seat=cabin,
-                    passengers=Passengers(adults=1, children=0, infants_in_seat=0, infants_on_lap=0),
-                    fetch_mode="local",
-                )
-                flights_with_date = []
-                for flight in result.flights:
-                    flight_dict = flight.__dict__
-                    flight_dict['date'] = date
-                    flights_with_date.append(flight_dict)
-                return flights_with_date
-            except Exception as e:
-                print(f"Final attempt (local) failed for {origin_airport} -> {dest_airport} on {date} ({cabin}): {e}")
-                return []
+                    else:
+                        print(f"All attempts failed for {origin_airport} -> {dest_airport} on {date} ({cabin})")
+                        return []
 
     tasks = [search_single_flight(o, d, dt) for o, d, dt in search_combinations]
     all_flights_lists = await asyncio.gather(*tasks)

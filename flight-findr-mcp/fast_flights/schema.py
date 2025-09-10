@@ -1,5 +1,14 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
+
+
+@dataclass
+class Result:
+    current_price: str
+    flights: List[Flight]
+
 
 @dataclass
 class Flight:
