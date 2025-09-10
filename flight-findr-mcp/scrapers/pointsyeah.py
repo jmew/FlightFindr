@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
 import asyncio
 import re
+import random
 from typing import List, Dict, Any, Optional, Tuple
 from scrapers.utils import parse_time, fetch_cash_prices, normalize_program_name, LEGEND
 from datetime import datetime, timedelta
@@ -14,7 +15,7 @@ import airportsdata
 import functools
 
 class PointsYeahScraper:
-    CONCURRENCY_LIMIT = 5
+    CONCURRENCY_LIMIT = 3
 
     def __init__(self, playwright: Playwright, headless: bool = True):
         self.playwright: Playwright = playwright
@@ -91,6 +92,7 @@ class PointsYeahScraper:
 
             async def scrape_with_semaphore(context, job):
                 async with semaphore:
+                    await asyncio.sleep(random.uniform(1, 2))
                     job_type = job.get("job_type")
                     if job_type == "matrix":
                         return await self._scrape_matrix_search(context, job)
@@ -529,60 +531,60 @@ async def main_test():
                     ("SFO", "CDG")
                 ]
             },
-            {
-                "job_type": "matrix",
-                "origins": ["LHR", "CDG"],
-                "destinations": ["BKK", "NRT", "ICN"],
-                "start_date": "2025-10-24",
-                "end_date": "2025-10-28",
-                "valid_routes": [
-                    ("LHR", "BKK"),
-                    ("LHR", "NRT"),
-                    ("CDG", "NRT"),
-                    ("CDG", "ICN")
-                ]
-            },
-            {
-                "job_type": "matrix",
-                "origins": ["YYZ"],
-                "destinations": ["YVR"],
-                "start_date": "2025-11-24",
-                "end_date": "2025-11-27",
-                "valid_routes": [
-                    ("YYZ", "YVR")
-                ]
-            },
-            {
-                "job_type": "matrix",
-                "origins": ["YYZ"],
-                "destinations": ["YVR"],
-                "start_date": "2025-12-24",
-                "end_date": "2025-12-27",
-                "valid_routes": [
-                    ("YYZ", "YVR")
-                ]
-            },
-            {
-                "job_type": "matrix",
-                "origins": ["YYZ"],
-                "destinations": ["YVR"],
-                "start_date": "2025-10-24",
-                "end_date": "2025-10-27",
-                "valid_routes": [
-                    ("YYZ", "YVR")
-                ]
-            },
-            {
-                "job_type": "matrix",
-                "origins": ["DXB"],
-                "destinations": ["HKG", "SIN"],
-                "start_date": "2025-12-24",
-                "end_date": "2025-12-28",
-                "valid_routes": [
-                    ("DXB", "HKG"),
-                    ("DXB", "SIN"),
-                ]
-            },
+            # {
+            #     "job_type": "matrix",
+            #     "origins": ["LHR", "CDG"],
+            #     "destinations": ["BKK", "NRT", "ICN"],
+            #     "start_date": "2025-10-24",
+            #     "end_date": "2025-10-28",
+            #     "valid_routes": [
+            #         ("LHR", "BKK"),
+            #         ("LHR", "NRT"),
+            #         ("CDG", "NRT"),
+            #         ("CDG", "ICN")
+            #     ]
+            # },
+            # {
+            #     "job_type": "matrix",
+            #     "origins": ["YYZ"],
+            #     "destinations": ["YVR"],
+            #     "start_date": "2025-11-24",
+            #     "end_date": "2025-11-27",
+            #     "valid_routes": [
+            #         ("YYZ", "YVR")
+            #     ]
+            # },
+            # {
+            #     "job_type": "matrix",
+            #     "origins": ["YYZ"],
+            #     "destinations": ["YVR"],
+            #     "start_date": "2025-12-24",
+            #     "end_date": "2025-12-27",
+            #     "valid_routes": [
+            #         ("YYZ", "YVR")
+            #     ]
+            # },
+            # {
+            #     "job_type": "matrix",
+            #     "origins": ["YYZ"],
+            #     "destinations": ["YVR"],
+            #     "start_date": "2025-10-24",
+            #     "end_date": "2025-10-27",
+            #     "valid_routes": [
+            #         ("YYZ", "YVR")
+            #     ]
+            # },
+            # {
+            #     "job_type": "matrix",
+            #     "origins": ["DXB"],
+            #     "destinations": ["HKG", "SIN"],
+            #     "start_date": "2025-12-24",
+            #     "end_date": "2025-12-28",
+            #     "valid_routes": [
+            #         ("DXB", "HKG"),
+            #         ("DXB", "SIN"),
+            #     ]
+            # },
             # {
             #     "job_type": "multicity",
             #     "leg1": {"origin": "LHR", "destination": "HKG", "start_date": "2025-11-01", "end_date": "2025-11-02"},
