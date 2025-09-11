@@ -12,9 +12,9 @@ load_dotenv()
 LEGEND = {
     "field_order": {
         "deal": ["segments", "options", "duration_minutes"],
-        "segment": ["flight_number", "dep_airport", "arr_airport", "dep_time", "arr_time", "layover_mins"],
-        "option": ["program", "transfer_partners", "url_params", "cabins"],
-        "cabin_deal": ["points", "tax", "cash_price", "cpp"]
+        "segment": ["flight_number", "dep_airport", "arr_airport", "dep_time", "arr_time"],
+        "option": ["program", "transfer_partners", "booking_url", "cabins"],
+        "cabin_deal": ["points", "tax", "cash_price?", "cpp?"]
     },
     "programs": {
         "EY": "Etihad Guest", "VA": "Virgin Australia Velocity", "AS": "Alaska Atmos Rewards", 
@@ -87,11 +87,13 @@ async def fetch_cash_prices(origin: str, destination: str, dates: List[str], cab
     origins = origin.split(',')
     destinations = destination.split(',')
     
-    # Generate all combinations of origins, destinations, and dates
-    search_combinations = list(itertools.product(origins, destinations, dates))
+    # Generate all combinations of origins, destinations, and dates, excluding same origin/destination
+    search_combinations = [
+        prod for prod in itertools.product(origins, destinations, dates) if prod[0] != prod[1]
+    ]
     
-    # Limit concurrency to 5 to avoid overwhelming the local Playwright
-    semaphore = asyncio.Semaphore(5)
+    # Limit concurrency to 3 to avoid overwhelming the local Playwright
+    semaphore = asyncio.Semaphore(3)
 
     async def search_single_flight(origin_airport, dest_airport, date):
         async with semaphore:

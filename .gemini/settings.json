@@ -1,0 +1,9 @@
+{
+    "mcpServers": {
+      "Flight Deal Finder": {
+        "httpUrl": "http://localhost:9999/mcp",
+        "timeout": 360000,
+        "trust": true
+      }
+    }
+}

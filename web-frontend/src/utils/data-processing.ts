@@ -1,4 +1,7 @@
-import type { CompactFlightDeal, BookingOption } from '../types';
+import type { CompactFlightDeal, BookingOption, FlightSegment } from '../types';
+import { toZonedTime } from 'date-fns-tz';
+import { differenceInMinutes, differenceInCalendarDays } from 'date-fns';
+import airportTimezone from 'airport-timezone';
 
 export const decompressFlightData = (parsedResult: any): CompactFlightDeal[] => {
   if (!parsedResult.deals || !parsedResult.legend) {
@@ -6,7 +9,7 @@ export const decompressFlightData = (parsedResult: any): CompactFlightDeal[] => 
   }
 
   const { legend, deals } = parsedResult;
-  const { cabin_codes, programs, banks, booking_urls } = legend;
+  const { cabin_codes, programs, banks } = legend;
 
   const decompressedDeals: CompactFlightDeal[] = deals.map((deal: any, index: number) => {
     const [segments, options, duration_minutes] = deal;
@@ -20,23 +23,73 @@ export const decompressFlightData = (parsedResult: any): CompactFlightDeal[] => 
     const stops = segments.slice(0, -1).map((seg: any) => seg[2]);
     const airlines = [...new Set(segments.map((seg: any) => seg[0].substring(0, 2)))];
     const flight_numbers = segments.map((seg: any) => seg[0]);
-    const layover_lengths = segments.slice(0, -1).map((seg: any) => seg[5]);
-    
-    let overnight_layover = false;
-    for (let i = 0; i < segments.length - 1; i++) {
-        const arr_time = new Date(segments[i][4]);
-        const dep_time = new Date(segments[i+1][3]);
-        if (arr_time.getDate() !== dep_time.getDate()) {
-            overnight_layover = true;
-            break;
+
+    const processedSegments: FlightSegment[] = segments.map((seg: any, i: number) => {
+        const depAirport = seg[1];
+        const arrAirport = seg[2];
+        const depTimeStr = seg[3];
+        const arrTimeStr = seg[4];
+
+        const depTzEntry = airportTimezone.find((airport: any) => airport.code === depAirport);
+        const arrTzEntry = airportTimezone.find((airport: any) => airport.code === arrAirport);
+        const depTz = depTzEntry?.timezone;
+        const arrTz = arrTzEntry?.timezone;
+
+        let duration = 0;
+        let dayDiff: number | undefined = undefined;
+        let isOvernight = false;
+
+        if (depTz && arrTz) {
+            const depTime = toZonedTime(depTimeStr, depTz);
+            const arrTime = toZonedTime(arrTimeStr, arrTz);
+            
+            duration = differenceInMinutes(arrTime, depTime);
+            const calDayDiff = differenceInCalendarDays(arrTime, depTime);
+            if (calDayDiff > 0) {
+                dayDiff = calDayDiff;
+                isOvernight = true;
+            }
+        } else {
+            // Fallback for airports not in the library
+            const depTime = new Date(depTimeStr);
+            const arrTime = new Date(arrTimeStr);
+            duration = (arrTime.getTime() - depTime.getTime()) / (1000 * 60);
+            const depDate = new Date(depTime.getFullYear(), depTime.getMonth(), depTime.getDate());
+            const arrDate = new Date(arrTime.getFullYear(), arrTime.getMonth(), arrTime.getDate());
+            const calDayDiff = (arrDate.getTime() - depDate.getTime()) / (1000 * 60 * 60 * 24);
+            if (calDayDiff > 0) {
+                dayDiff = calDayDiff;
+                isOvernight = true;
+            }
         }
-    }
+        
+        let layoverMins: number | undefined = undefined;
+        if (i < segments.length - 1) {
+            const nextDepTime = new Date(segments[i+1][3]);
+            const arrTime = new Date(arrTimeStr);
+            layoverMins = (nextDepTime.getTime() - arrTime.getTime()) / (1000 * 60);
+        }
+
+        return {
+            airlineCode: seg[0].substring(0, 2),
+            flightNumber: seg[0],
+            departureAirport: depAirport,
+            arrivalAirport: arrAirport,
+            departureTime: depTimeStr,
+            arrivalTime: arrTimeStr,
+            durationMinutes: duration,
+            layoverMinutes: layoverMins,
+            arrivalDayDiff: dayDiff,
+            isOvernight: isOvernight,
+        };
+    });
+    
+    const overnight_layover = processedSegments.some(seg => seg.isOvernight);
 
     const bookingOptions: BookingOption[] = options.map((opt: any) => {
-        const [program_code, transfer_partner_codes, url_params, cabin_deals] = opt;
+        const [program_code, transfer_partner_codes, booking_url, cabin_deals] = opt;
         
         const program = programs[program_code] || program_code;
-        const booking_url = booking_urls[program_code]?.replace('{params}', url_params) || '';
         const transfer_info = transfer_partner_codes.map((code: string) => banks[code] || code);
 
         const bookingOption: BookingOption = {
@@ -46,7 +99,11 @@ export const decompressFlightData = (parsedResult: any): CompactFlightDeal[] => 
         };
 
         for (const cabin_code in cabin_deals) {
-            const [points, tax, cash_price, cpp] = cabin_deals[cabin_code];
+            const dealData = cabin_deals[cabin_code];
+            const [points, tax] = dealData;
+            const cash_price = dealData.length > 2 ? dealData[2] : undefined;
+            const cpp = dealData.length > 3 ? dealData[3] : undefined;
+
             const cabin_name_full = cabin_codes[cabin_code] || cabin_code;
             const cabin_name = cabin_name_full.toLowerCase().replace(' ', '');
             
@@ -57,7 +114,7 @@ export const decompressFlightData = (parsedResult: any): CompactFlightDeal[] => 
 
             bookingOption[cabin_key] = {
                 points,
-                fees: `$${tax}`,
+                fees: `${tax}`,
                 bonus: null,
                 exact_cash_price: cash_price,
                 exact_cpp: cpp,
@@ -75,10 +132,9 @@ export const decompressFlightData = (parsedResult: any): CompactFlightDeal[] => 
         stops,
         airlines,
         overnight_layover,
-        layover_duration: layover_lengths.reduce((a: number, b: number) => a + b, 0),
         flight_numbers,
-        layover_lengths,
         options: bookingOptions,
+        segments: processedSegments,
     };
   });
 

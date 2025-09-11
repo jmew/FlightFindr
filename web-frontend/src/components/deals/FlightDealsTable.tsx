@@ -44,9 +44,7 @@ const calculateTopFlightScore = (deal: CompactFlightDeal, cheapestPrice: number,
   } else if (stopCount >= 2) {
     stopsPenalty = 2.5;
   }
-  if ((deal.layover_duration || 0) > 240) { // 4 hours
-    stopsPenalty += 0.5;
-  }
+  
 
   let timePenalty = 0;
   const departureHour = new Date(deal.departure_time).getHours();

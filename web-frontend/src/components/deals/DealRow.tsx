@@ -7,9 +7,11 @@ import {
 } from 'react-icons/fi';
 import Logo from '../common/Logo';
 import type { CompactFlightDeal, BookingOption, CabinDeal } from '../../types';
-import { formatDuration, formatFlightTimes } from '../../utils/formatters';
+import { formatDuration, formatFlightTimes, formatTime } from '../../utils/formatters';
 import { getAirlineNameByCode } from '../../utils/airlineMappings';
+import aircodes from 'aircodes';
 import styles from './FlightDealsTable.module.css';
+import itineraryStyles from './Itinerary.module.css';
 
 interface DealRowProps {
   deal: CompactFlightDeal;
@@ -46,7 +48,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, showDate, hasCashPrice }) => {
 
   const { bestCabinDeal, bestOption } = bestDeal;
   const { points, fees, bonus } = bestCabinDeal;
-  const { transfer_info, program } = bestOption;
+  const { program } = bestOption;
 
   const [origin, destination] = deal.route.split(' -> ');
   const { departureTime, arrivalTime, isNextDay } = formatFlightTimes(
@@ -171,60 +173,93 @@ const DealRow: React.FC<DealRowProps> = ({ deal, showDate, hasCashPrice }) => {
       </div>
       {isExpanded && (
         <div className={styles.dealRowExpandedDetails}>
-          <div className="detail-item">
-            <strong>Flight Numbers:</strong> {deal.flight_numbers.join(', ')}
-          </div>
-          {deal.layover_lengths && deal.layover_lengths.length > 0 && (
-              <div className="detail-item">
-                <strong>Layovers:</strong>
-                <span>
-                  {deal.layover_lengths.map((duration, index) => (
-                    `Layover ${index + 1}: ${formatDuration(duration)}`
-                  )).join(', ')}
-                </span>
-              </div>
-            )}
-          <div className={`${styles.detailItem} ${styles.transfers}`}>
-            <strong>Transfer From:</strong>
-            <div className={styles.transferPartners}>
-                {transfer_info.map((partner: string) => (
-                  <Logo key={partner} type="bank" name={partner} />
-                ))}
-              </div>
-            </div>
-            <div className={styles.bookingOptionsContainer}>
-              {deal.options.map(option => (
-                <div key={option.program} className={styles.bookingOptionCard}>
-                  <div className={styles.bookingOptionHeader}>
-                    <span className={styles.bookingOptionProgram}>Book on {option.program}</span>
-                    <div className={styles.transferPartnersSmall}>
-                      {option.transfer_info.map(p => <Logo key={p} type="bank" name={p} />)}
+          <div className={itineraryStyles.itineraryContainer}>
+            {deal.segments.map((segment, index) => (
+              <React.Fragment key={index}>
+                <div className={itineraryStyles.itinerarySegment}>
+                  <div className={itineraryStyles.logoContainer}>
+                    <Logo type="airline" code={segment.airlineCode} name={getAirlineNameByCode(segment.airlineCode)} />
+                  </div>
+                  <div className={itineraryStyles.timeline}>
+                    <div className={itineraryStyles.dot}></div>
+                    <div className={itineraryStyles.line}></div>
+                    <div className={itineraryStyles.dot}></div>
+                  </div>
+                  <div className={itineraryStyles.legDetails}>
+                    <div className={itineraryStyles.timeAndAirport}>
+                      <span className={itineraryStyles.time}>{formatTime(segment.departureTime)}</span>
+                      <span>·</span>
+                      <span className={itineraryStyles.airport}>
+                        {aircodes.getAirportByIata(segment.departureAirport)?.name || segment.departureAirport} ({segment.departureAirport})
+                      </span>
+                    </div>
+                    <div className={itineraryStyles.travelTime}>
+                      <span>Travel time: {formatDuration(segment.durationMinutes)}</span>
+                      {segment.isOvernight && (
+                        <span className={itineraryStyles.overnight}>
+                          <FiAlertTriangle />
+                          Overnight
+                        </span>
+                      )}
+                    </div>
+                    <div className={itineraryStyles.timeAndAirport}>
+                      <span className={itineraryStyles.time}>
+                        {formatTime(segment.arrivalTime)}
+                        {segment.arrivalDayDiff && <sup>+{segment.arrivalDayDiff}</sup>}
+                      </span>
+                      <span>·</span>
+                      <span className={itineraryStyles.airport}>
+                        {aircodes.getAirportByIata(segment.arrivalAirport)?.name || segment.arrivalAirport} ({segment.arrivalAirport})
+                      </span>
                     </div>
                   </div>
-                  <div className={styles.cabinOptions}>
-                    {['economy', 'premium', 'business', 'first'].map(cabin => {
-                      const cabinData = option[cabin as keyof BookingOption] as CabinDeal | undefined;
-                      if (!cabinData) return null;
-                      return (
-                        <div key={cabin} className={styles.cabinOption}>
-                          <span className={styles.cabinName}>{cabin.charAt(0).toUpperCase() + cabin.slice(1)}</span>
-                          <span className={styles.cabinPoints}>{cabinData.points.toLocaleString()} pts</span>
-                          <span className={styles.cabinFees}>+ {cabinData.fees}</span>
-                        </div>
-                      )
-                    })}
+                  <div className={itineraryStyles.flightInfo}>
+                      {getAirlineNameByCode(segment.airlineCode)} · {segment.flightNumber}
                   </div>
-                  <a
-                    href={option.booking_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="deal-card-book-btn"
-                  >
-                    Book Award Flight
-                  </a>
                 </div>
-              ))}
-            </div>
+                {segment.layoverMinutes && (
+                  <div className={itineraryStyles.layover}>
+                    <div className={itineraryStyles.layoverContent}>
+                      {formatDuration(segment.layoverMinutes)} layover · {aircodes.getAirportByIata(segment.arrivalAirport)?.name || segment.arrivalAirport} ({segment.arrivalAirport})
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+          <div className={styles.bookingOptionsContainer}>
+            {deal.options.map(option => (
+              <div key={option.program} className={styles.bookingOptionCard}>
+                <div className={styles.bookingOptionHeader}>
+                  <span className={styles.bookingOptionProgram}>Book on {option.program}</span>
+                  <div className={styles.transferPartnersSmall}>
+                    {option.transfer_info.map(p => <Logo key={p} type="bank" name={p} />)}
+                  </div>
+                </div>
+                <div className={styles.cabinOptions}>
+                  {['economy', 'premium', 'business', 'first'].map(cabin => {
+                    const cabinData = option[cabin as keyof BookingOption] as CabinDeal | undefined;
+                    if (!cabinData) return null;
+                    return (
+                      <div key={cabin} className={styles.cabinOption}>
+                        <span className={styles.cabinName}>{cabin.charAt(0).toUpperCase() + cabin.slice(1)}</span>
+                        <span className={styles.cabinPoints}>{cabinData.points.toLocaleString()} pts</span>
+                        <span className={styles.cabinFees}>+ {cabinData.fees}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <a
+                  href={option.booking_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="deal-card-book-btn"
+                >
+                  Book Award Flight
+                </a>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
