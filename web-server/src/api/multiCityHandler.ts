@@ -15,9 +15,9 @@ export async function multiCityHandler(req: Request, res: Response) {
   }
 
   try {
-    const { config, client } = await getOrCreateClient(sessionId);
+    const { config, client, abortController } = await getOrCreateClient(sessionId);
     sendSseMessage(res, 'thought', {
-      subject: 'Building your multi-city trip...',
+      subject: 'Building your multi-city trip...', 
     });
     const { startLocation, endLocation, intermediateStops, startDate, endDate, maxLength, constraints, flexible } = req.body;
     let message = `Find a multi-city trip for me. I want to start in ${startLocation} and end in ${endLocation}.`;
@@ -37,12 +37,11 @@ export async function multiCityHandler(req: Request, res: Response) {
       message += ` Please also consider the following constraints: ${constraints}`;
     }
 
-    const abortController = new AbortController();
     req.on('close', () => {
-      abortController.abort();
+      abortController!.abort();
     });
 
-    await streamGeminiResponse(res, client, config, [{ text: message }], abortController);
+    await streamGeminiResponse(res, client, config, [{ text: message }], abortController!);
 
   } catch (error) {
     console.error('Error processing multi-city request:', error);
