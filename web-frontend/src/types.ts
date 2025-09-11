@@ -35,6 +35,19 @@ export interface BookingOption {
   first?: CabinDeal;
 }
 
+export interface FlightSegment {
+  airlineCode: string;
+  flightNumber: string;
+  departureAirport: string;
+  arrivalAirport: string;
+  departureTime: string;
+  arrivalTime: string;
+  durationMinutes: number;
+  layoverMinutes?: number;
+  arrivalDayDiff?: number;
+  isOvernight?: boolean;
+}
+
 export interface CompactFlightDeal {
   id: string;
   route: string;
@@ -45,7 +58,6 @@ export interface CompactFlightDeal {
   stops?: string[];
   airlines?: string[];
   overnight_layover?: boolean;
-  layover_duration?: number;
-  layover_lengths?: number[];
   options: BookingOption[];
+  segments: FlightSegment[];
 }

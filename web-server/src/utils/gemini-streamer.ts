@@ -8,7 +8,7 @@ import {
 } from '@google/gemini-cli-core';
 
 // Helper to format and send SSE messages
-const sendSseMessage = (
+export const sendSseMessage = (
   res: Response,
   event: string,
   data: Record<string, unknown> | string,

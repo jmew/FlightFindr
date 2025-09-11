@@ -8,12 +8,14 @@ import json
 import asyncio
 import re
 import random
+import statistics
 from typing import List, Dict, Any, Optional, Tuple
 from scrapers.utils import parse_time, fetch_cash_prices, normalize_program_name, LEGEND
 from datetime import datetime, timedelta
 import pytz
 import airportsdata
 import functools
+from urllib.parse import parse_qs, urlencode
 from fake_useragent import UserAgent
 
 class PointsYeahScraper:
@@ -139,6 +141,9 @@ class PointsYeahScraper:
                             if cabin_code not in existing_cabins or cabin_deal[0] < existing_cabins[cabin_code][0]:
                                 existing_cabins[cabin_code] = cabin_deal
         
+        all_deals_dict = self._filter_deals_by_points(all_deals_dict)
+        all_deals_dict = self._apply_composite_score_filter(all_deals_dict)
+
         valid_cash_results = [r for r in all_cash_prices_results if not isinstance(r, Exception)]
         self._match_cash_prices(all_deals_dict, valid_cash_results)
 
@@ -151,13 +156,15 @@ class PointsYeahScraper:
                 [
                     option_data['program'],
                     option_data['transfer_partners'],
-                    option_data['url_params'],
+                    option_data['booking_url'],
                     option_data['cabins']
                 ] for option_data in program_options.values()
             ]
             final_deals.append([list(segments), options_list, duration])
 
         result = {"legend": self.LEGEND, "deals": final_deals}
+        if "booking_urls" in result["legend"]:
+            del result["legend"]["booking_urls"]
         return json.dumps(result, indent=2)
 
     async def _scrape_matrix_search(self, context: Any, job: Dict[str, Any]) -> Dict[Any, Any]:
@@ -165,7 +172,8 @@ class PointsYeahScraper:
         destinations = job.get("destinations", [])
         start_date = job.get("start_date")
         end_date = job.get("end_date")
-        valid_routes = set(tuple(r) for r in job.get("valid_routes", []))
+        valid_routes_list = job.get("valid_routes")
+        valid_routes = set(tuple(r) for r in valid_routes_list) if valid_routes_list is not None else None
 
         page = await context.new_page()
         
@@ -198,12 +206,16 @@ class PointsYeahScraper:
             await page.goto(search_url, timeout=90000, wait_until='domcontentloaded')
             
             try:
-                await asyncio.wait_for(first_response_received.wait(), timeout=15)
+                await asyncio.wait_for(first_response_received.wait(), timeout=25)
             except asyncio.TimeoutError:
-                raise Exception("No flight data received within 15 seconds.")
+                raise Exception("No flight data received within 25 seconds.")
 
             await asyncio.wait_for(search_done_future, timeout=70)
             print("MATRIX search complete, filtering results...")
+            
+            if valid_routes is None:
+                return best_deals
+
             filtered_deals = {}
             for segments, (duration, program_options) in best_deals.items():
                 if not segments: continue
@@ -350,12 +362,6 @@ class PointsYeahScraper:
     def _extract_segments_data(self, valid_segments: List[Dict[str, Any]]) -> Tuple[Tuple[Any, ...], ...]:
         segments_data = []
         for i, s in enumerate(valid_segments):
-            layover_mins = 0
-            if i < len(valid_segments) - 1:
-                arr_time = datetime.fromisoformat(s.get('at'))
-                dep_time = datetime.fromisoformat(valid_segments[i+1].get('dt'))
-                layover_mins = round((dep_time - arr_time).total_seconds() / 60)
-            
             flight_number = s.get('flight_number')
             da = s.get('da')
             aa = s.get('aa')
@@ -364,12 +370,19 @@ class PointsYeahScraper:
 
             segment_tuple = (
                 flight_number, da, aa,
-                dt, at, layover_mins
+                dt, at
             )
             segments_data.append(segment_tuple)
         return tuple(segments_data)
 
     def _get_booking_option(self, route: Dict[str, Any], program_code: str) -> Dict[str, Any]:
+        URL_PARAM_MAP = {
+            'tripType': 't', 'departure': 'd', 'arrival': 'a', 'departDate': 'dd',
+            'departDateSec': 'dds', 'multiday': 'md', 'departure2': 'd2', 'arrival2': 'a2',
+            'departDate2': 'dd2', 'departDateSec2': 'dds2', 'cabins': 'cs', 'cabin': 'c',
+            'banks': 'bs', 'airlineProgram': 'ap', 'adults': 'as', 'children': 'ch'
+        }
+
         bank_legend_short = {
             "Chase Ultimate Rewards": "chase",
             "American Exp Membership Rewards": "amex",
@@ -382,12 +395,25 @@ class PointsYeahScraper:
             bank_legend_short.get(t.get("bank")) for t in transfer_info_raw 
             if t.get("bank") and bank_legend_short.get(t.get("bank"))
         ])
+        
         booking_url = route.get("url", "")
-        url_params = booking_url.split('?')[1] if '?' in booking_url else ""
+        if '?' in booking_url:
+            base_url, url_params_str = booking_url.split('?', 1)
+            parsed_params = parse_qs(url_params_str)
+            minified_params = {}
+            for key, value in parsed_params.items():
+                short_key = URL_PARAM_MAP.get(key, key)
+                minified_params[short_key] = value
+            
+            minified_url_params_str = urlencode(minified_params, doseq=True)
+            final_url = f"{base_url}?{minified_url_params_str}"
+        else:
+            final_url = booking_url
+
         return {
             "program": program_code,
             "transfer_partners": transfer_partners,
-            "url_params": url_params,
+            "booking_url": final_url, # New key
             "cabins": {}
         }
 
@@ -396,7 +422,7 @@ class PointsYeahScraper:
             if not deal.get("routes"): continue
             
             program_code = self._get_program_code(deal.get("code"), deal.get("program"))
-            if not program_code: continue
+            if not program_code or program_code == 'AA': continue
 
             for route in deal["routes"]:
                 payment = route.get("payment", {})
@@ -425,7 +451,7 @@ class PointsYeahScraper:
                     elif "business" in cabin: cabin_code = "J"
                     elif "first" in cabin: cabin_code = "F"
                     
-                    cabin_deal_data = [points, payment.get('tax'), None, None]
+                    cabin_deal_data = [points, payment.get('tax')]
 
                     existing_cabin_deal = option_data["cabins"].get(cabin_code)
                     if not existing_cabin_deal or points < existing_cabin_deal[0]:
@@ -433,6 +459,186 @@ class PointsYeahScraper:
                 except TypeError as e:
                     print(f"Error processing deal: {e}")
                     print(f"Problematic segments: {valid_segments}")
+
+    def _filter_deals_by_points(self, deals_dict: Dict[Any, Any]) -> Dict[Any, Any]:
+        """Filters deals based on points thresholds."""
+        
+        # 1. Collect all economy prices, grouped by route
+        economy_prices_by_route: Dict[Tuple[str, str], List[int]] = {}
+        for segments_key, (_, program_options) in deals_dict.items():
+            if not segments_key:
+                continue
+            origin = segments_key[0][1]
+            destination = segments_key[-1][2]
+            route_key = (origin, destination)
+
+            for _, option_data in program_options.items():
+                if 'Y' in option_data['cabins']:
+                    points = option_data['cabins']['Y'][0]
+                    if route_key not in economy_prices_by_route:
+                        economy_prices_by_route[route_key] = []
+                    economy_prices_by_route[route_key].append(points)
+
+        # 2. Calculate the points threshold for economy on each route
+        economy_thresholds: Dict[Tuple[str, str], float] = {}
+        for route_key, prices in economy_prices_by_route.items():
+            if len(prices) > 1:
+                mean = statistics.mean(prices)
+                stdev = statistics.stdev(prices)
+                economy_thresholds[route_key] = mean + stdev
+            else:
+                # If only one data point, don't filter it
+                economy_thresholds[route_key] = float('inf')
+
+        # 3. Iterate through deals and apply all filters
+        fixed_thresholds = {'F': 200000, 'J': 120000, 'W': 80000}
+        filtered_deals_dict: Dict[Any, Any] = {}
+
+        for segments_key, (duration, program_options) in deals_dict.items():
+            if not segments_key:
+                continue
+            
+            origin = segments_key[0][1]
+            destination = segments_key[-1][2]
+            route_key = (origin, destination)
+
+            filtered_program_options = {}
+            for program_code, option_data in program_options.items():
+                filtered_cabins = {}
+                for cabin_code, cabin_deal in option_data['cabins'].items():
+                    points = cabin_deal[0]
+                    
+                    should_keep = True
+                    if cabin_code in fixed_thresholds:
+                        if points > fixed_thresholds[cabin_code]:
+                            should_keep = False
+                    elif cabin_code == 'Y':
+                        # Only filter if a threshold was calculated for this route
+                        if route_key in economy_thresholds and points > economy_thresholds[route_key]:
+                            should_keep = False
+                    
+                    if should_keep:
+                        filtered_cabins[cabin_code] = cabin_deal
+                
+                if filtered_cabins:
+                    # Important: create a copy to avoid modifying the original dict while iterating
+                    new_option_data = option_data.copy()
+                    new_option_data['cabins'] = filtered_cabins
+                    filtered_program_options[program_code] = new_option_data
+            
+            if filtered_program_options:
+                filtered_deals_dict[segments_key] = (duration, filtered_program_options)
+
+        return filtered_deals_dict
+
+    def _apply_composite_score_filter(self, deals_dict: Dict[Any, Any]) -> Dict[Any, Any]:
+        """
+        Applies a composite score to filter for the top 50% of deals per route and cabin.
+        """
+        # 1. Create a flat list of deals
+        all_individual_deals = []
+        for segments_key, (duration, program_options) in deals_dict.items():
+            if not segments_key: continue
+            
+            stops = len(segments_key) - 1
+            origin = segments_key[0][1]
+            destination = segments_key[-1][2]
+
+            for program_code, option_data in program_options.items():
+                for cabin_code, cabin_deal in option_data['cabins'].items():
+                    points = cabin_deal[0]
+                    fees = cabin_deal[1] or 0 # tax can be None
+
+                    all_individual_deals.append({
+                        "segments_key": segments_key,
+                        "program_code": program_code,
+                        "cabin_code": cabin_code,
+                        "origin": origin,
+                        "destination": destination,
+                        "points": points,
+                        "fees": fees,
+                        "duration": duration,
+                        "stops": stops,
+                    })
+
+        if not all_individual_deals:
+            return {}
+
+        # 2. Group deals by (origin, destination, cabin_code)
+        grouped_deals = {}
+        for deal in all_individual_deals:
+            key = (deal['origin'], deal['destination'], deal['cabin_code'])
+            if key not in grouped_deals:
+                grouped_deals[key] = []
+            grouped_deals[key].append(deal)
+
+        # 3. Score, rank, and filter each group
+        filtered_deals_to_keep = set() # Use a set of (segments_key, program_code, cabin_code)
+
+        for group_key, deals_in_group in grouped_deals.items():
+            if len(deals_in_group) <= 2: # Don't filter small groups
+                for deal in deals_in_group:
+                    filtered_deals_to_keep.add((deal['segments_key'], deal['program_code'], deal['cabin_code']))
+                continue
+
+            weights = {'points': 0.45, 'fees': 0.15, 'duration': 0.25, 'stops': 0.15}
+            
+            # Normalize continuous metrics
+            continuous_metrics = ['points', 'fees', 'duration']
+            min_max = {}
+            for m in continuous_metrics:
+                values = [d[m] for d in deals_in_group]
+                min_max[m] = (min(values), max(values))
+
+            for deal in deals_in_group:
+                score = 0
+                # Score continuous metrics
+                for m in continuous_metrics:
+                    min_val, max_val = min_max[m]
+                    if max_val == min_val:
+                        norm_score = 1.0
+                    else:
+                        norm_score = (max_val - deal[m]) / (max_val - min_val)
+                    score += norm_score * weights[m]
+                
+                # Score stops
+                stops = deal['stops']
+                if stops == 0:
+                    stops_score = 1.0
+                elif stops == 1:
+                    stops_score = 0.5
+                else:
+                    stops_score = 0.0
+                score += stops_score * weights['stops']
+
+                deal['score'] = score
+
+            # Sort and filter
+            deals_in_group.sort(key=lambda d: d['score'], reverse=True)
+            num_to_keep = max(1, int(len(deals_in_group) * 0.5)) # Keep top 50%, at least 1
+            
+            for deal in deals_in_group[:num_to_keep]:
+                filtered_deals_to_keep.add((deal['segments_key'], deal['program_code'], deal['cabin_code']))
+
+        # 4. Reconstruct the deals_dict
+        new_deals_dict = {}
+        for segments_key, (duration, program_options) in deals_dict.items():
+            new_program_options = {}
+            for program_code, option_data in program_options.items():
+                new_cabins = {}
+                for cabin_code, cabin_deal in option_data['cabins'].items():
+                    if (segments_key, program_code, cabin_code) in filtered_deals_to_keep:
+                        new_cabins[cabin_code] = cabin_deal
+                
+                if new_cabins:
+                    new_option_data = option_data.copy()
+                    new_option_data['cabins'] = new_cabins
+                    new_program_options[program_code] = new_option_data
+            
+            if new_program_options:
+                new_deals_dict[segments_key] = (duration, new_program_options)
+                
+        return new_deals_dict
 
     def _match_cash_prices(self, deals_dict: Dict[Any, Any], cash_searches_results: List[Dict[str, Any]]):
         if not deals_dict or not cash_searches_results:
@@ -515,9 +721,10 @@ class PointsYeahScraper:
                         for program_code, option_data in program_options.items():
                             if cash_cabin_code in option_data['cabins']:
                                 cabin_deal = option_data['cabins'][cash_cabin_code]
-                                points = cabin_deal[0]
-                                cabin_deal[2] = price
-                                cabin_deal[3] = round((price / points) * 100, 2) if points > 0 else 0
+                                if len(cabin_deal) == 2: # Only add cash price once
+                                    points = cabin_deal[0]
+                                    cpp = round((price / points) * 100, 2) if points > 0 else 0
+                                    cabin_deal.extend([price, cpp])
                     except (ValueError, TypeError, KeyError):
                         continue
 
@@ -532,112 +739,3 @@ class PointsYeahScraper:
         cash_price_tasks = [fetch_cash_prices(origin, destination, dates, cabin) for cabin in ['economy', 'premium-economy', 'business', 'first']]
         results = await asyncio.gather(*cash_price_tasks)
         return {"origin": origin, "destination": destination, "cabin_prices": results}
-
-import time
-async def main_test():
-    """Test function to run the scraper for a sample search."""
-    scraper = None
-    try:
-        scraper = await PointsYeahScraper.create()
-
-        jobs = [
-            {
-                "job_type": "matrix",
-                "origins": ["SEA", "JFK", "SFO"],
-                "destinations": ["LHR", "CDG"],
-                "start_date": "2025-10-20",
-                "end_date": "2025-10-24",
-                "valid_routes": [
-                    ("SEA", "LHR"),
-                    ("JFK", "LHR"),
-                    ("SFO", "CDG")
-                ]
-            },
-            {
-                "job_type": "matrix",
-                "origins": ["LHR", "CDG"],
-                "destinations": ["BKK", "NRT", "ICN"],
-                "start_date": "2025-10-24",
-                "end_date": "2025-10-28",
-                "valid_routes": [
-                    ("LHR", "BKK"),
-                    ("LHR", "NRT"),
-                    ("CDG", "NRT"),
-                    ("CDG", "ICN")
-                ]
-            },
-            {
-                "job_type": "matrix",
-                "origins": ["YYZ"],
-                "destinations": ["YVR"],
-                "start_date": "2025-11-24",
-                "end_date": "2025-11-27",
-                "valid_routes": [
-                    ("YYZ", "YVR")
-                ]
-            },
-            {
-                "job_type": "matrix",
-                "origins": ["YYZ"],
-                "destinations": ["YVR"],
-                "start_date": "2025-12-24",
-                "end_date": "2025-12-27",
-                "valid_routes": [
-                    ("YYZ", "YVR")
-                ]
-            },
-            {
-                "job_type": "matrix",
-                "origins": ["YYZ"],
-                "destinations": ["YVR"],
-                "start_date": "2025-10-24",
-                "end_date": "2025-10-27",
-                "valid_routes": [
-                    ("YYZ", "YVR")
-                ]
-            },
-            {
-                "job_type": "matrix",
-                "origins": ["DXB"],
-                "destinations": ["HKG", "SIN"],
-                "start_date": "2025-12-24",
-                "end_date": "2025-12-27",
-                "valid_routes": [
-                    ("DXB", "HKG"),
-                    ("DXB", "SIN"),
-                ]
-            },
-            # {
-            #     "job_type": "multicity",
-            #     "leg1": {"origin": "LHR", "destination": "HKG", "start_date": "2025-11-01", "end_date": "2025-11-02"},
-            #     "leg2": {"origin": "HKG", "destination": "TPE", "start_date": "2025-11-15", "end_date": "2025-11-16"}
-            # }
-        ]
-
-        start_time = time.perf_counter()
-        deals_json = await scraper.search_flights(jobs)
-        
-        deals_data = json.loads(deals_json)
-        print(f"Found {len(deals_data.get('deals', []))} deals.")
-        end_time = time.perf_counter()
-        
-        flight_count = 0
-        for deal in deals_data.get('deals', []):
-            options = deal[1]
-            for option in options:
-                cabins = option[3]
-                flight_count += len(cabins)
-        print(f"Found {flight_count} individual flight options.")
-
-        duration = end_time - start_time
-        print(f"The search took {duration} seconds.")
-
-        # with open("deals.json", 'w') as f:
-        #     json.dump(deals_data, f, indent=2)
-
-    finally:
-        if scraper:
-            await scraper.close()
-
-if __name__ == '__main__':
-    asyncio.run(main_test())

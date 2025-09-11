@@ -1,0 +1,93 @@
+.itineraryContainer {
+  grid-column: 1 / -1;
+  padding: 6px 0;
+}
+
+.itinerarySegment {
+  display: flex;
+  gap: 12px;
+}
+
+.logoContainer {
+  width: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--gem-sys-color--on-surface-variant);
+  border-radius: 50%;
+  background-color: var(--gem-sys-color--surface);
+}
+
+.line {
+  flex-grow: 1;
+  width: 1px;
+  border-left: 1px dotted var(--gem-sys-color--on-surface-variant);
+}
+
+.legDetails {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.timeAndAirport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time {
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: right;
+}
+
+.airport {
+  font-size: 1rem;
+}
+
+.travelTime {
+  margin: 12px 0;
+  font-size: 0.85rem;
+  color: var(--gem-sys-color--on-surface-variant);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flightInfo {
+  font-size: 0.75rem;
+  color: var(--gem-sys-color--on-surface-variant);
+}
+
+.layover {
+  padding: 16px 0;
+  margin: 16px 0;
+  font-size: 0.9rem;
+  color: var(--gem-sys-color--on-surface-variant);
+  border-top: 1px solid var(--gem-sys-color--on-surface-variant);
+  border-bottom: 1px solid var(--gem-sys-color--on-surface-variant);
+}
+
+.layoverContent {
+  padding-left: 72px;
+}
+
+.overnight {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+}
