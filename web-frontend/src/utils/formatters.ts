@@ -9,6 +9,7 @@ export const formatDate = (dateString: string | undefined): string => {
       return 'Invalid Date';
     }
     return date.toLocaleDateString('en-US', {
+      weekday: 'short',
       month: 'short',
       day: 'numeric',
     });
