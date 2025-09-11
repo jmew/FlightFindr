@@ -13,6 +13,7 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
   const [intermediateStops, setIntermediateStops] = useState(['']);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [minLength, setMinLength] = useState('');
   const [maxLength, setMaxLength] = useState('');
   const [constraints, setConstraints] = useState('');
   const [flexible, setFlexible] = useState(true);
@@ -71,6 +72,9 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
       message += `I want to visit the following places: ${intermediateStops.join(', ')}. `;
     }
     message += `I want to travel between ${startDate} and ${endDate}. `;
+    if (minLength) {
+      message += `The minimum trip length is ${minLength} days. `;
+    }
     if (maxLength) {
       message += `The maximum trip length is ${maxLength} days. `;
     }
@@ -156,7 +160,7 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
       </Row>
 
       <Row className="mb-3">
-        <Col md={4}>
+        <Col md={6}>
           <InputGroup>
             <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
             <Form.Control
@@ -175,7 +179,7 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
             />
           </InputGroup>
         </Col>
-        <Col md={4}>
+        <Col md={6}>
           <InputGroup>
             <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
             <Form.Control
@@ -196,7 +200,22 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
             />
           </InputGroup>
         </Col>
-        <Col md={4}>
+      </Row>
+
+      <Row className="mb-3">
+        <Col md={6}>
+           <InputGroup>
+            <InputGroup.Text className={styles.inputGroupText}><FaClock /></InputGroup.Text>
+            <Form.Control
+              type="number"
+              placeholder="Min trip length (days)"
+              value={minLength}
+              onChange={(e) => setMinLength(e.target.value)}
+              className={styles.formControl}
+            />
+          </InputGroup>
+        </Col>
+        <Col md={6}>
            <InputGroup>
             <InputGroup.Text className={styles.inputGroupText}><FaClock /></InputGroup.Text>
             <Form.Control

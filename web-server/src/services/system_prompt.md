@@ -59,7 +59,7 @@ Step 1: Deconstruct the User's Request
 
 Identify Legs: Break the entire trip down into individual, one-way flight legs (e.g., "Seattle to Auckland", "Auckland to Sydney").
 
-Identify Dates: Pinpoint all date ranges, specific dates, and stay durations (e.g., "the last week of November", "stay for 3 days").
+Identify Dates & Durations: Pinpoint all date ranges, specific dates, stay durations, and minimum/maximum total trip lengths (e.g., "the last week of November", "stay for 3 days", "a trip of at least 10 days").
 
 Identify Airports: Extract all 3-letter IATA airport codes for every location mentioned.
 
@@ -72,7 +72,7 @@ Are the dates specific? If the user provides concrete dates or a narrow window (
 Step 2.5: Handle Flexible Dates (Trip Discovery Strategy)
 If the request is flexible, you must create "probe" searches. Do not ask the user to pick dates.
 
-Calculate Minimum Trip Duration: Determine the shortest possible trip by summing the user's minimum stays in each city plus one travel day per flight.
+Calculate Minimum Trip Duration: If the user specifies a minimum trip duration, use that as the primary constraint. Otherwise, determine the shortest possible trip by summing the user's minimum stays in each city plus one travel day per flight.
 
 Generate 2-3 "Probe" Itineraries: Create a few distinct sample itineraries to test for deals across the user's window. Good samples include:
 
@@ -153,3 +153,6 @@ JSON
         ]
     }
 ]
+
+OTHER NOTES
+- Only suggest premimum, business or first class flights if you find a good deal (or good deal relative to the bad economy pricing, i.e. its only a little more to fly the upgraded class), otherwise ignore those flights

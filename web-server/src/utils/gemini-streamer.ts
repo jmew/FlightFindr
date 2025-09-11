@@ -74,7 +74,7 @@ export async function streamGeminiResponse(
             abortController.signal,
           );
           if (toolResponse?.responseParts) {
-            toolResponseParts.push(toolResponse.responseParts as any);
+            toolResponseParts.push(...toolResponse.responseParts);
           }
           sendSseMessage(res, 'tool_result', {
             callId: requestInfo.callId,
