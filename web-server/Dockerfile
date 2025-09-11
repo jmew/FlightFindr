@@ -24,6 +24,8 @@ RUN npm ci --omit=dev
 # Copy the built application from the builder stage
 COPY --from=builder /app/dist ./dist
 
+COPY --from=builder /app/src/services/system_prompt.md ./dist/services/system_prompt.md
+
 # Expose the port and start the server
 EXPOSE 3000
 CMD ["npm", "start"]
