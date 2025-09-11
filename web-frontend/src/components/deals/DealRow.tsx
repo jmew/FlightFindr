@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fi';
 import Logo from '../common/Logo';
 import type { CompactFlightDeal, BookingOption, CabinDeal } from '../../types';
-import { formatDuration, formatFlightTimes, formatTime } from '../../utils/formatters';
+import { formatDuration, formatFlightTimes, formatTime, formatDate } from '../../utils/formatters';
 import { getAirlineNameByCode } from '../../utils/airlineMappings';
 import aircodes from 'aircodes';
 import styles from './FlightDealsTable.module.css';
@@ -104,7 +104,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, showDate, hasCashPrice }) => {
         <div className={`${styles.section} ${styles.timeInfo}`}>
           {showDate && (
             <div style={{ fontSize: '0.8em', fontFamily: 'roboto', color: 'var(--gem-sys-color--on-surface-variant)' }}>
-              {new Date(deal.departure_time.replace(/-/g, '/')).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {formatDate(deal.departure_time)}
             </div>
           )}
           <span className={styles.time}>

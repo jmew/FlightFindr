@@ -1,8 +1,13 @@
 export const formatDate = (dateString: string | undefined): string => {
   if (!dateString) return 'N/A';
   try {
-    // Adding T00:00:00 ensures the date is parsed in UTC, preventing off-by-one day errors
-    const date = new Date(dateString + 'T00:00:00');
+    // Take only the date part of the string to avoid issues with timezones and parsing
+    const datePart = dateString.split('T')[0];
+    // Replace dashes with slashes to parse as local date, avoiding off-by-one day errors
+    const date = new Date(datePart.replace(/-/g, '/'));
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
