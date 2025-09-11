@@ -23,6 +23,11 @@ export function getSession(sessionId: string) {
   return sessions.get(sessionId);
 }
 
+export function deleteSession(sessionId: string) {
+  console.log(`Deleting session: ${sessionId}`);
+  sessions.delete(sessionId);
+}
+
 export async function getOrCreateClient(sessionId: string) {
   if (sessions.has(sessionId)) {
     console.log(`Reusing Gemini client for session: ${sessionId}`);
@@ -59,7 +64,7 @@ export async function getOrCreateClient(sessionId: string) {
     mcpServers: {
       'Flight Deal Finder': {
         httpUrl: mcpUrl,
-        timeout: 120000,
+        timeout: 340000,
         trust: true,
       },
     },

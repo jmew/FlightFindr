@@ -35,5 +35,6 @@ export const streamMultiCityChat = (body: any, sessionId: string, onMessage: (ev
     onmessage: onMessage,
     onclose: onStop,
     onerror: onError,
+    openWhenHidden: true,
   });
 }

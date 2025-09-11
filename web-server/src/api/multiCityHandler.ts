@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { getOrCreateClient } from '../services/sessionManager.js';
+import { getOrCreateClient, deleteSession } from '../services/sessionManager.js';
 import { streamGeminiResponse, sendSseMessage } from '../utils/gemini-streamer.js';
 
 export async function multiCityHandler(req: Request, res: Response) {
@@ -47,7 +47,13 @@ export async function multiCityHandler(req: Request, res: Response) {
     console.error('Error processing multi-city request:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'An unknown error occurred.';
-    sendSseMessage(res, 'error', { error: errorMessage });
+    
+    if (errorMessage.includes('terminated')) {
+        deleteSession(sessionId);
+        sendSseMessage(res, 'error', { error: 'The request timed out while processing the flight results. The session has been reset. Please try your search again.' });
+    } else {
+        sendSseMessage(res, 'error', { error: errorMessage });
+    }
   } finally {
     res.end();
   }
