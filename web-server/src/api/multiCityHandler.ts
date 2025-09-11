@@ -16,6 +16,9 @@ export async function multiCityHandler(req: Request, res: Response) {
 
   try {
     const { config, client } = await getOrCreateClient(sessionId);
+    sendSseMessage(res, 'thought', {
+      subject: 'Building your multi-city trip...',
+    });
     const { startLocation, endLocation, intermediateStops, startDate, endDate, maxLength, constraints, flexible } = req.body;
     let message = `Find a multi-city trip for me. I want to start in ${startLocation} and end in ${endLocation}.`;
     if (intermediateStops && intermediateStops.length > 0 && intermediateStops[0] !== '') {

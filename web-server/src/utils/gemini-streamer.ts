@@ -63,7 +63,7 @@ export async function streamGeminiResponse(
     if (toolCallRequests.length > 0) {
       const toolResponseParts: Part[] = [];
       const keepAliveInterval = setInterval(() => {
-        res.write(': keep-alive\n\n');
+        sendSseMessage(res, 'keep-alive', {});
       }, 15000);
 
       try {
