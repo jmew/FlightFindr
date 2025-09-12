@@ -189,15 +189,16 @@ const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice, showDate, medianF
         <div className={styles.dealRowExpandedDetails}>
           <div className={itineraryStyles.itineraryContainer}>
             {deal.segments.map((segment, index) => {
-              const firstSegmentDepartureDate = deal.segments[0].departureTime.substring(0, 10);
-              const nextSegment = deal.segments[index + 1];
+              // TODO keep this here for now since we might use the layover date logic in the future
+              // const firstSegmentDepartureDate = deal.segments[0].departureTime.substring(0, 10);
+              // const nextSegment = deal.segments[index + 1];
               // let showLayoverDate = false;
-              if (nextSegment) {
-                const nextSegmentDepartureDate = nextSegment.departureTime.substring(0, 10);
+              // if (nextSegment) {
+                // const nextSegmentDepartureDate = nextSegment.departureTime.substring(0, 10);
                 // if (nextSegmentDepartureDate !== firstSegmentDepartureDate) {
                 //   showLayoverDate = true;
                 // }
-              }
+              // }
 
               return (
                 <React.Fragment key={index}>
