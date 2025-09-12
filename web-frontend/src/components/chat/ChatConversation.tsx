@@ -24,9 +24,9 @@ const placeholderSuggestions = [
 ];
 
 const suggestionBubbles = [
-  'SEA -> JFK Oct 4',
-  'HKG -> HND Dec 12',
-  'LHR -> DOH Feb 4',
+  'SEA → JFK Oct 4',
+  'HKG → HND Dec 12',
+  'LHR → DOH Feb 4',
 ];
 
 import styles from './ChatConversation.module.css';

@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fi';
 import Logo from '../common/Logo';
 import type { CompactFlightDeal, BookingOption, CabinDeal } from '../../types';
-import { formatDuration, formatFlightTimes, formatTime } from '../../utils/formatters';
+import { formatDuration, formatFlightTimes, formatTime, formatDate } from '../../utils/formatters';
 import { getAirlineNameByCode } from '../../utils/airlineMappings';
 import aircodes from 'aircodes';
 import styles from './FlightDealsTable.module.css';
@@ -16,9 +16,10 @@ import itineraryStyles from './Itinerary.module.css';
 interface DealRowProps {
   deal: CompactFlightDeal;
   hasCashPrice: boolean;
+  showDate?: boolean;
 }
 
-const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice }) => {
+const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice, showDate }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const bestDeal = useMemo(() => {
@@ -54,6 +55,8 @@ const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice }) => {
     deal.departure_time,
     deal.arrival_time,
   );
+
+  const departureDate = showDate ? formatDate(deal.departure_time): null;
 
   const isDirect = (deal.stops || []).length === 0;
 
@@ -101,7 +104,8 @@ const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice }) => {
           <span className={styles.airlineName}>{displayName}</span>
         </div>
         <div className={`${styles.section} ${styles.timeInfo}`} data-label="Flight">
-          <div className={styles.sectionContent}>
+          <div className={styles.timeInfoContent}>
+            {departureDate && <div className={styles.date}>{departureDate}</div>}
             <span className={styles.time}>
               {departureTime} → {arrivalTime}
               {isNextDay && <sup>+1</sup>}

@@ -21,6 +21,8 @@ Constraints:
 
 The date window (end_date - start_date) cannot exceed 5 days.
 
+end_date and start_date can be the same date if you want to look for flights that depart only on one day.
+
 This window is reduced to 4 days if the job contains only one origin and one destination.
 
 Structure:
@@ -154,7 +156,11 @@ JSON
     }
 ]
 
-OTHER NOTES
+FINAL RESPONSE
 - Only suggest premimum, business or first class flights if you find a good deal (or good deal relative to the bad economy pricing, i.e. its only a little more to fly the upgraded class), otherwise ignore those flights
 
 - For any request the user asks around the best flight, the user will already be provided a nice google flights interface to view all the flight results, so you dont need to worry about showing them all the results)
+
+- If the user did a seasrch that spans mutliple days, or mutliple routes over multiple days, tell the user what the cheapest day to fly is for that scope.
+
+- ANd finally provide 3 of the best itineraries you can think of for the users trip (unless they ask for a different amount explicity). Show this in a breif and consice way, but thats clear (e.g. departure date time, and airport, and all the layovers). and give a breif pros and cons of each of the 3 best (cons only if you can think of them)

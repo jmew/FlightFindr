@@ -34,7 +34,7 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
   useEffect(() => {
     if (startDate) {
       const start = new Date(startDate);
-      const maxDate = new Date(start.getTime() + 28 * 24 * 60 * 60 * 1000); // 28 days later
+      const maxDate = new Date(start.getTime() + 21 * 24 * 60 * 60 * 1000); // 21 days later
       const formattedMaxDate = maxDate.toISOString().split('T')[0];
       setMaxEndDate(formattedMaxDate);
 
@@ -82,6 +82,8 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
     }
     handleSendMessage(message);
   };
+
+  const today = new Date().toISOString().split('T')[0];
 
   return (
     <Form onSubmit={handleSubmit}>
@@ -157,16 +159,17 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
 
       <Row className={`mb-3 ${styles.formRow}`}>
         <Col md={6}>
-          <InputGroup>
+          <InputGroup onClick={() => startDateRef.current?.focus()}>
             <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
             <Form.Control
               type={startDateType}
               onFocus={() => {
                 setStartDateType('date');
-                startDateRef.current?.showPicker();
+                setTimeout(() => startDateRef.current?.showPicker(), 0);
               }}
               onBlur={() => !startDate && setStartDateType('text')}
               placeholder="Start date"
+              min={today}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               required
@@ -176,17 +179,17 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
           </InputGroup>
         </Col>
         <Col md={6}>
-          <InputGroup>
+          <InputGroup onClick={() => endDateRef.current?.focus()}>
             <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
             <Form.Control
               type={endDateType}
               onFocus={() => {
                 setEndDateType('date');
-                endDateRef.current?.showPicker();
+                setTimeout(() => endDateRef.current?.showPicker(), 0);
               }}
               onBlur={() => !endDate && setEndDateType('text')}
               placeholder="End date"
-              min={startDate}
+              min={startDate || today}
               max={maxEndDate}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}

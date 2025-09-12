@@ -137,7 +137,10 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
             lastStop = stop;
         }
         expectedLegs.push(`${lastStop} → ${endLocation}`);
-        finalRoutes = finalRoutes.filter(route => expectedLegs.includes(route));
+        
+        finalRoutes = finalRoutes
+            .filter(route => expectedLegs.includes(route))
+            .sort((a, b) => expectedLegs.indexOf(a) - expectedLegs.indexOf(b));
     }
 
 
@@ -157,6 +160,8 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
       availableDates: formattedDates,
     };
   }, [deals, userQuery]);
+
+  const spansMultipleDates = availableDates.length > 1;
 
   useEffect(() => {
     if (availableRoutes.length > 0) {
@@ -351,6 +356,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
             <DealRow
               deal={deal}
               hasCashPrice={hasAnyCashPrice}
+              showDate={spansMultipleDates}
             />
           </React.Fragment>
         ))}

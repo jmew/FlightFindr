@@ -94,8 +94,10 @@ async def startup_event():
 
 async def shutdown_event():
     """Closes the scraper instance."""
+    print("Executing shutdown event...")
     if mcp_server.scraper:
         await mcp_server.scraper.close()
+    print("Shutdown event complete.")
 
 async def main_async(args):
     """Runs startup, the server, and shutdown."""
@@ -134,7 +136,9 @@ def main():
     try:
         asyncio.run(main_async(args))
     except KeyboardInterrupt:
-        print("\nServer stopped by user.")
+        # asyncio.run() already handles graceful cancellation of the task.
+        # This block is here to ensure a final message is printed.
+        print("\nMain process received KeyboardInterrupt.")
     
     print("MCP Server has shut down.")
 

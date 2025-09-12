@@ -55,11 +55,19 @@ class PointsYeahScraper:
         )
 
     async def close(self):
-        print("Closing browser...")
-        if self.browser:
-            await self.browser.close()
+        print("Closing scraper resources...")
+        if self.browser and self.browser.is_connected():
+            print("Closing browser...")
+            try:
+                await asyncio.wait_for(self.browser.close(), timeout=5.0)
+                print("Browser closed.")
+            except asyncio.TimeoutError:
+                print("Warning: Browser close timed out.")
         if self._cm:
+            print("Exiting playwright context manager...")
             await self._cm.__aexit__(None, None, None)
+            print("Playwright context manager exited.")
+        print("Scraper resources closed.")
 
     async def search_flights(self, jobs: List[Dict[str, Any]]) -> str:
         if not self.browser:

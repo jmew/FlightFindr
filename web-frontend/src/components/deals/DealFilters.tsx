@@ -40,6 +40,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
   maxPoints,
   availableCabins,
   availableStops,
+  className,
   availableDates,
   selectedDate,
   onDateChange,
@@ -181,7 +182,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
   const inactiveFilters = filtersConfig.filter(f => !f.isActive);
 
   return (
-    <div className={styles.dealFiltersContainer}>
+    <div className={`${styles.dealFiltersContainer} ${className || ''}`}>
       <div
         ref={scrollContainerRef}
         className={`${styles.filterChipsScrollContainer} ${isScrollable ? styles.isScrollable : ''}`}
