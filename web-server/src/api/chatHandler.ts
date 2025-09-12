@@ -14,8 +14,29 @@ export async function chatHandler(req: Request, res: Response) {
     return;
   }
 
+  const authHeader = req.headers.authorization;
+  const isDevMode = process.env.NODE_ENV !== 'production';
+  
+  // In production, we require an auth token. In dev, it's optional.
+  if (!isDevMode && (!authHeader || !authHeader.startsWith('Bearer '))) {
+    res.status(401).json({ error: 'Unauthorized: Missing bearer token.' });
+    return;
+  }
+
+  const encodedToken = authHeader?.split(' ')[1];
+  let authToken: string | undefined;
+  if (encodedToken) {
+    authToken = Buffer.from(encodedToken, 'base64').toString('utf8');
+  }
+
   try {
-    const { config, client, abortController } = await getOrCreateClient(sessionId);
+    const clientData = await getOrCreateClient(sessionId, authToken);
+    if (!clientData) {
+      res.status(401).json({ error: 'Unauthorized: Invalid token.' });
+      return;
+    }
+
+    const { config, client, abortController } = clientData;
     const message = req.query['message'] as string;
     if (!message) {
       res.status(400).json({ error: 'Message is required.' });

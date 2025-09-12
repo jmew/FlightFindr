@@ -1,36 +1,35 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://web-server-304334704110.us-central1.run.app';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
-export const streamChat = (message: string, sessionId: string, onMessage: (event: any) => void, onStop: () => void, onError: (err: any) => void) => {
-  const eventSource = new EventSource(
-    `${BASE_URL}/chat?message=${encodeURIComponent(
-      message,
-    )}&sessionId=${sessionId}`,
-  );
-
-  eventSource.addEventListener('content', (event) => onMessage({ event: 'content', data: event.data }));
-  eventSource.addEventListener('thought', (event) => onMessage({ event: 'thought', data: event.data }));
-  eventSource.addEventListener('tool_code', (event) => onMessage({ event: 'tool_code', data: event.data }));
-  eventSource.addEventListener('tool_result', (event) => onMessage({ event: 'tool_result', data: event.data }));
-  eventSource.addEventListener('end', () => {
-    eventSource.close();
-    onStop();
-  });
-  eventSource.addEventListener('error', (err) => {
-    eventSource.close();
-    onError(err);
-  });
-
-  return eventSource;
+const getAuthHeaders = () => {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+    const tokenData = localStorage.getItem('google_auth_token');
+    if (tokenData) {
+        // Base64 encode the token data to ensure safe transmission in the header.
+        const encodedToken = btoa(tokenData);
+        headers['Authorization'] = `Bearer ${encodedToken}`;
+    }
+    return headers;
 }
 
+export const streamChat = (message: string, sessionId: string, onMessage: (event: any) => void, onStop: () => void, onError: (err: any) => void) => {
+  const url = `${API_BASE_URL}/chat?message=${encodeURIComponent(message)}&sessionId=${sessionId}`;
+  fetchEventSource(url, {
+    headers: getAuthHeaders(),
+    onmessage: onMessage,
+    onclose: onStop,
+    onerror: onError,
+    openWhenHidden: true,
+  });
+};
+
 export const streamMultiCityChat = (body: any, sessionId: string, onMessage: (event: any) => void, onStop: () => void, onError: (err: any) => void) => {
-  fetchEventSource(`${BASE_URL}/multi-city?sessionId=${sessionId}`, {
+  fetchEventSource(`${API_BASE_URL}/multi-city?sessionId=${sessionId}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(body),
     onmessage: onMessage,
     onclose: onStop,
@@ -38,3 +37,13 @@ export const streamMultiCityChat = (body: any, sessionId: string, onMessage: (ev
     openWhenHidden: true,
   });
 }
+
+export const getSuggestions = async (text: string): Promise<string[]> => {
+  const response = await fetch(`${API_BASE_URL}/suggestions?text=${encodeURIComponent(text)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch suggestions');
+  }
+  return response.json();
+};

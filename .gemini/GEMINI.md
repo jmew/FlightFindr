@@ -107,6 +107,19 @@ Long-running scraper requests (> 60 seconds) will cause timeouts on cloud platfo
 
 The `fastmcp` library does not appear to support the ASGI `lifespan` protocol for startup/shutdown events. Therefore, the `mcp_server.py` manages the Playwright lifecycle manually within its `main_async` function, starting the browser before the server runs and using a `try...finally` block to guarantee it closes on shutdown.
 
+#### Production vs. Development Authentication
+
+The application uses two different authentication strategies depending on the environment:
+
+*   **Production Mode:** In the deployed environment (`NODE_ENV=production`), the application uses a "just-in-time" Google OAuth flow. The user is only prompted to sign in via a modal when they submit their first chat message. The backend verifies the user's OAuth token for every request but uses its own server-side `GEMINI_API_KEY` to communicate with the Gemini API. The user's token is stored securely in the browser's `localStorage` to persist the session.
+
+*   **Development Mode:** When running locally (`npm run dev`), the OAuth flow is bypassed by default to speed up development. The frontend operates in a pre-authenticated state, and the backend relies on the `GEMINI_API_KEY` environment variable. To test the full OAuth flow locally, append `?force_oauth=true` to the URL (e.g., `http://localhost:5173/?force_oauth=true`).
+
+#### Per-Request Backend Authentication
+
+To support multiple concurrent users securely, the `web-server` is architected to be stateless regarding user credentials. It does **not** use the Gemini CLI library's default filesystem-based token cache. Instead, for each authenticated API request, it creates a temporary credential file in memory from the user's token, points the Gemini library to it via an environment variable (`GOOGLE_APPLICATION_CREDENTIALS`), initializes the client for that single request, and then immediately deletes the temporary file in a `finally` block. This ensures that each user's credentials are used to make calls on their behalf and are strictly isolated from all other users.
+
+
 ### **CRITICAL: Final Verification Steps**
 
 1.  **Scraper:** Before claiming any task involving the `flight-findr-mcp` scraper is complete, you **must** run the local test script to verify your changes have not caused a regression.

@@ -4,7 +4,12 @@ import { streamChat, streamMultiCityChat } from '../services/api';
 import { decompressFlightData } from '../utils/data-processing';
 import { parseMultiCityMessage } from '../utils/message-parser';
 
-export function useChat() {
+interface UseChatOptions {
+  isAuthenticated: boolean;
+  onAuthRequired: (message: string) => void;
+}
+
+export function useChat({ isAuthenticated, onAuthRequired }: UseChatOptions) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -12,24 +17,22 @@ export function useChat() {
   isLoadingRef.current = isLoading;
 
   const [thought, setThought] = useState<string | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    sessionIdRef.current = crypto.randomUUID();
-  }, []);
+    if (isAuthenticated) {
+      sessionIdRef.current = crypto.randomUUID();
+    }
+  }, [isAuthenticated]);
 
   const stopStreaming = () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-      if (sessionIdRef.current && isLoading) {
-        // If we were in the middle of a stream, notify the server to cancel.
-        fetch(`/api/cancel?sessionId=${sessionIdRef.current}`).catch(console.error);
-      }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -56,6 +59,12 @@ export function useChat() {
   const handleSendMessage = (message: string) => {
     if (!message.trim() || isLoading) return;
 
+    if (!isAuthenticated) {
+      onAuthRequired(message);
+      return;
+    }
+
+    abortControllerRef.current = new AbortController();
     const userMessage: Message = { sender: 'user', text: message };
     setMessages((prevMessages) => [...prevMessages, userMessage]);
     setInput('');
@@ -86,7 +95,6 @@ export function useChat() {
         return; // Ignore keep-alive messages
       }
       const data = JSON.parse(event.data);
-      console.log(event.event);
       switch (event.event) {
         case 'content':
           currentBotMessage += data.chunk;
@@ -188,7 +196,7 @@ export function useChat() {
       const body = parseMultiCityMessage(message);
       streamMultiCityChat(body, sessionIdRef.current, onMessage, onStop, onError);
     } else {
-      eventSourceRef.current = streamChat(message, sessionIdRef.current, onMessage, onStop, onError);
+      streamChat(message, sessionIdRef.current, onMessage, onStop, onError);
     }
   };
 
