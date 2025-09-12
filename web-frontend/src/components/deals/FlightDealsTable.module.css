@@ -164,6 +164,30 @@
   color: var(--gem-sys-color--on-surface-variant);
 }
 
+.routeTabs {
+  border-bottom: 1px solid var(--gem-sys-color--outline);
+}
+
+.routeTabs .nav-link {
+  font-family: 'Roboto', "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  color: #e8eaed;
+  background-color: transparent;
+  cursor: pointer;
+}
+
+.routeTabs .nav-link.active {
+  color: #d2e3fc;
+  background-color: var(--gem-sys-color--surface);
+  border-color: var(--gem-sys-color--outline);
+  z-index: 1;
+  margin-bottom: -1px;
+}
+
 @media (max-width: 768px) {
   .dealRow {
     display: block;

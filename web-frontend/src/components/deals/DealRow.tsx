@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fi';
 import Logo from '../common/Logo';
 import type { CompactFlightDeal, BookingOption, CabinDeal } from '../../types';
-import { formatDuration, formatFlightTimes, formatTime, formatDate } from '../../utils/formatters';
+import { formatDuration, formatFlightTimes, formatTime } from '../../utils/formatters';
 import { getAirlineNameByCode } from '../../utils/airlineMappings';
 import aircodes from 'aircodes';
 import styles from './FlightDealsTable.module.css';
@@ -15,11 +15,10 @@ import itineraryStyles from './Itinerary.module.css';
 
 interface DealRowProps {
   deal: CompactFlightDeal;
-  showDate: boolean;
   hasCashPrice: boolean;
 }
 
-const DealRow: React.FC<DealRowProps> = ({ deal, showDate, hasCashPrice }) => {
+const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const bestDeal = useMemo(() => {

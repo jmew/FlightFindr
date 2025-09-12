@@ -1,6 +1,6 @@
 import type { CompactFlightDeal, BookingOption, FlightSegment } from '../types';
-import { toZonedTime, getTimezoneOffset } from 'date-fns-tz';
-import { differenceInMinutes, differenceInCalendarDays } from 'date-fns';
+import { getTimezoneOffset } from 'date-fns-tz';
+import { differenceInMinutes } from 'date-fns';
 import airportTimezone from 'airport-timezone';
 
 export const decompressFlightData = (parsedResult: any): CompactFlightDeal[] => {

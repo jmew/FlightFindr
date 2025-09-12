@@ -130,7 +130,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
     let finalRoutes = Array.from(routes);
     if (userQuery && userQuery.startsWith('Find a multi-city trip for me.')) {
         const { startLocation, intermediateStops, endLocation } = parseMultiCityMessage(userQuery);
-        const expectedLegs = [];
+        const expectedLegs: string[] = [];
         let lastStop = startLocation;
         for (const stop of intermediateStops) {
             expectedLegs.push(`${lastStop} → ${stop}`);
@@ -182,8 +182,6 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
       }
     };
   }, []);
-
-  const showDates = availableDates.length > 1;
 
   const filteredDeals = useMemo(() => {
     setCurrentPage(1);
@@ -324,7 +322,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
         <Tabs
           activeKey={selectedRoute}
           onSelect={(k) => setSelectedRoute(k || '')}
-          className="mb-3"
+          className={`mb-3 ${styles.routeTabs}`}
           id="route-tabs"
         >
           {availableRoutes.map(route => (
@@ -352,7 +350,6 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
           <React.Fragment key={deal.id}>
             <DealRow
               deal={deal}
-              showDate={availableDates.length > 1}
               hasCashPrice={hasAnyCashPrice}
             />
           </React.Fragment>
