@@ -16,7 +16,6 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
   const [minLength, setMinLength] = useState('');
   const [maxLength, setMaxLength] = useState('');
   const [constraints, setConstraints] = useState('');
-  const [flexible, setFlexible] = useState(true);
   const [isRoundTrip, setIsRoundTrip] = useState(true);
   const [startDateType, setStartDateType] = useState('text');
   const [endDateType, setEndDateType] = useState('text');
@@ -77,9 +76,6 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
     }
     if (maxLength) {
       message += `The maximum trip length is ${maxLength} days. `;
-    }
-    if (flexible) {
-      message += `The order of the intermediate stops is flexible. `;
     }
     if (constraints) {
       message += `Please also consider the following constraints: ${constraints}`;
@@ -237,16 +233,6 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
           value={constraints}
           onChange={(e) => setConstraints(e.target.value)}
           className={styles.formControl}
-        />
-      </Form.Group>
-
-      <Form.Group className="mb-3">
-        <Form.Check 
-          type="checkbox"
-          label="Let us pick the order of the intermediate stops for the best itinerary"
-          id="flexible-itinerary-checkbox"
-          checked={flexible}
-          onChange={(e) => setFlexible(e.target.checked)}
         />
       </Form.Group>
 

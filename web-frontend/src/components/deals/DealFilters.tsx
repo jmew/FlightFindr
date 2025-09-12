@@ -25,6 +25,9 @@ interface DealFiltersProps {
   availableCabins: string[];
   availableStops: string[];
   className?: string;
+  availableDates: string[];
+  selectedDate: string;
+  onDateChange: (date: string) => void;
 }
 
 const DealFilters: React.FC<DealFiltersProps> = ({
@@ -37,6 +40,9 @@ const DealFilters: React.FC<DealFiltersProps> = ({
   maxPoints,
   availableCabins,
   availableStops,
+  availableDates,
+  selectedDate,
+  onDateChange,
 }) => {
   const [currentMax, setCurrentMax] = useState(filters.maxPoints || maxPoints);
   const isPriceActive = filters.maxPoints !== null;
@@ -157,6 +163,19 @@ const DealFilters: React.FC<DealFiltersProps> = ({
       isMultiSelect: false,
     },
   ];
+
+  if (availableDates.length > 1) {
+    filtersConfig.splice(1, 0, {
+      id: 'date',
+      label: 'Date',
+      options: availableDates,
+      selectedOptions: selectedDate === 'all' ? [] : [selectedDate],
+      onChange: (selected: string[]) => onDateChange(selected[0] || 'all'),
+      onClear: () => onDateChange('all'),
+      isActive: selectedDate !== 'all',
+      isMultiSelect: false,
+    });
+  }
 
   const activeFilters = filtersConfig.filter(f => f.isActive);
   const inactiveFilters = filtersConfig.filter(f => !f.isActive);

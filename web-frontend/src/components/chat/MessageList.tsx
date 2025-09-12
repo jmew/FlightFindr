@@ -18,13 +18,25 @@ const MessageList: React.FC<MessageListProps> = ({
   lastMessageRef,
 }) => (
   <div className="chat-conversation">
-    {messages.map((msg, index) => (
-      <MessageBubble
-        key={index}
-        msg={msg}
-        ref={index === messages.length - 1 ? lastMessageRef : null}
-      />
-    ))}
+    {messages.map((msg, index) => {
+      let userQuery: string | undefined;
+      if (msg.sender === 'bot' && msg.flightData) {
+        for (let i = index - 1; i >= 0; i--) {
+          if (messages[i].sender === 'user') {
+            userQuery = messages[i].text;
+            break;
+          }
+        }
+      }
+      return (
+        <MessageBubble
+          key={index}
+          msg={msg}
+          userQuery={userQuery}
+          ref={index === messages.length - 1 ? lastMessageRef : null}
+        />
+      );
+    })}
     {isLoading && (
       <div className={styles.thoughtDisplay}>
         <svg className={styles.spinner} viewBox="0 0 50 50">

@@ -2,6 +2,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px; /* Tighter spacing between rows */
+  position: relative;
+  z-index: 1;
 }
 
 .dealRowContainer {
@@ -72,7 +74,7 @@
 
 .airlineInfo {
   gap: 4px !important;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .airlineInfo .logoIcon {

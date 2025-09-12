@@ -1,5 +1,5 @@
 import type { CompactFlightDeal, BookingOption, FlightSegment } from '../types';
-import { toZonedTime } from 'date-fns-tz';
+import { toZonedTime, getTimezoneOffset } from 'date-fns-tz';
 import { differenceInMinutes, differenceInCalendarDays } from 'date-fns';
 import airportTimezone from 'airport-timezone';
 
@@ -30,44 +30,49 @@ export const decompressFlightData = (parsedResult: any): CompactFlightDeal[] => 
         const depTimeStr = seg[3];
         const arrTimeStr = seg[4];
 
-        const depTzEntry = airportTimezone.find((airport: any) => airport.code === depAirport);
-        const arrTzEntry = airportTimezone.find((airport: any) => airport.code === arrAirport);
-        const depTz = depTzEntry?.timezone;
-        const arrTz = arrTzEntry?.timezone;
+        const depTz = airportTimezone.find((a: any) => a.code === depAirport)?.timezone;
+        const arrTz = airportTimezone.find((a: any) => a.code === arrAirport)?.timezone;
 
-        let duration = 0;
-        let dayDiff: number | undefined = undefined;
+        let durationMinutes = 0;
+        let arrivalDayDiff: number | undefined = undefined;
         let isOvernight = false;
 
         if (depTz && arrTz) {
-            const depTime = toZonedTime(depTimeStr, depTz);
-            const arrTime = toZonedTime(arrTimeStr, arrTz);
-            
-            duration = differenceInMinutes(arrTime, depTime);
-            const calDayDiff = differenceInCalendarDays(arrTime, depTime);
-            if (calDayDiff > 0) {
-                dayDiff = calDayDiff;
-                isOvernight = true;
-            }
-        } else {
-            // Fallback for airports not in the library
-            const depTime = new Date(depTimeStr);
-            const arrTime = new Date(arrTimeStr);
-            duration = (arrTime.getTime() - depTime.getTime()) / (1000 * 60);
-            const depDate = new Date(depTime.getFullYear(), depTime.getMonth(), depTime.getDate());
-            const arrDate = new Date(arrTime.getFullYear(), arrTime.getMonth(), arrTime.getDate());
+            const depTimePre = new Date(depTimeStr + 'Z');
+            const arrTimePre = new Date(arrTimeStr + 'Z');
+
+            const depOffset = getTimezoneOffset(depTz, depTimePre);
+            const arrOffset = getTimezoneOffset(arrTz, arrTimePre);
+
+            const depTime = new Date(depTimePre.getTime() - depOffset);
+            const arrTime = new Date(arrTimePre.getTime() - arrOffset);
+
+            durationMinutes = differenceInMinutes(arrTime, depTime);
+
+            const depDate = new Date(depTimeStr.substring(0, 10) + 'T00:00:00Z');
+            const arrDate = new Date(arrTimeStr.substring(0, 10) + 'T00:00:00Z');
             const calDayDiff = (arrDate.getTime() - depDate.getTime()) / (1000 * 60 * 60 * 24);
+
             if (calDayDiff > 0) {
-                dayDiff = calDayDiff;
+                arrivalDayDiff = calDayDiff;
                 isOvernight = true;
             }
         }
         
-        let layoverMins: number | undefined = undefined;
+        let layoverMinutes: number | undefined = undefined;
         if (i < segments.length - 1) {
-            const nextDepTime = new Date(segments[i+1][3]);
-            const arrTime = new Date(arrTimeStr);
-            layoverMins = (nextDepTime.getTime() - arrTime.getTime()) / (1000 * 60);
+            const nextDepTimeStr = segments[i+1][3];
+            if (arrTz) {
+                const arrTimePre = new Date(arrTimeStr + 'Z');
+                const nextDepTimePre = new Date(nextDepTimeStr + 'Z');
+                const arrOffset = getTimezoneOffset(arrTz, arrTimePre);
+                const nextDepOffset = getTimezoneOffset(arrTz, nextDepTimePre);
+
+                const arrTime = new Date(arrTimePre.getTime() - arrOffset);
+                const nextDepTime = new Date(nextDepTimePre.getTime() - nextDepOffset);
+                
+                layoverMinutes = differenceInMinutes(nextDepTime, arrTime);
+            }
         }
 
         return {
@@ -77,10 +82,10 @@ export const decompressFlightData = (parsedResult: any): CompactFlightDeal[] => 
             arrivalAirport: arrAirport,
             departureTime: depTimeStr,
             arrivalTime: arrTimeStr,
-            durationMinutes: duration,
-            layoverMinutes: layoverMins,
-            arrivalDayDiff: dayDiff,
-            isOvernight: isOvernight,
+            durationMinutes,
+            layoverMinutes,
+            arrivalDayDiff,
+            isOvernight,
         };
     });
     

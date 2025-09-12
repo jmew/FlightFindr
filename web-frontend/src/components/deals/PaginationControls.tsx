@@ -1,5 +1,6 @@
 import React from 'react';
 import { Form } from 'react-bootstrap';
+import { FaAngleDoubleLeft, FaAngleLeft, FaAngleRight, FaAngleDoubleRight } from 'react-icons/fa';
 import styles from './PaginationControls.module.css';
 
 interface PaginationControlsProps {
@@ -19,6 +20,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
 }) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
+  const handleFirstPage = () => onPageChange(1);
   const handlePrevPage = () => {
     if (currentPage > 1) {
       onPageChange(currentPage - 1);
@@ -30,6 +32,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
       onPageChange(currentPage + 1);
     }
   };
+  const handleLastPage = () => onPageChange(totalPages);
 
   return (
     <div className={styles.paginationContainer}>
@@ -45,14 +48,20 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
         </Form.Select>
       </div>
       <div className={styles.pageControls}>
+        <button onClick={handleFirstPage} disabled={currentPage === 1}>
+          <FaAngleDoubleLeft />
+        </button>
         <button onClick={handlePrevPage} disabled={currentPage === 1}>
-          Previous
+          <FaAngleLeft />
         </button>
         <span>
           Page {currentPage} of {totalPages}
         </span>
         <button onClick={handleNextPage} disabled={currentPage === totalPages}>
-          Next
+          <FaAngleRight />
+        </button>
+        <button onClick={handleLastPage} disabled={currentPage === totalPages}>
+          <FaAngleDoubleRight />
         </button>
       </div>
     </div>

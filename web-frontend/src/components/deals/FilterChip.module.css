@@ -46,4 +46,15 @@
 
 .dropdownItemText {
   color: rgb(232, 234, 237) !important;
+  font-size: 0.8rem;
+}
+
+.formCheckInput input[type="checkbox"],
+.formCheckInput input[type="radio"] {
+  transform: scale(0.8);
+  margin-right: 8px; /* Adjust spacing after scaling */
+}
+
+.formCheckInput label {
+  padding-top: 2px; /* Adjust label alignment */
 }

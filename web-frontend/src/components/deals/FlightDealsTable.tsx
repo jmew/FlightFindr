@@ -1,12 +1,15 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { Tabs, Tab } from 'react-bootstrap';
 import DealFilters from './DealFilters';
 import DealRow from './DealRow';
 import PaginationControls from './PaginationControls';
 import type { CompactFlightDeal, BookingOption, CabinDeal } from '../../types';
 import styles from './FlightDealsTable.module.css';
+import { parseMultiCityMessage } from '../../utils/message-parser';
 
 interface FlightDealsTableProps {
   deals: CompactFlightDeal[];
+  userQuery?: string;
 }
 
 interface ActiveFilters {
@@ -64,7 +67,7 @@ const calculateTopFlightScore = (deal: CompactFlightDeal, cheapestPrice: number,
   );
 };
 
-const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
+const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery }) => {
   const [filters, setFilters] = useState<ActiveFilters>({
     cabinClasses: ['Economy'],
     airlinePrograms: [],
@@ -76,6 +79,90 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [selectedRoute, setSelectedRoute] = useState('');
+  const [selectedDate, setSelectedDate] = useState('all');
+
+  const { availablePrograms, minPoints, maxPoints, shortestDuration, availableCabins, availableStops, availableRoutes, availableDates } = useMemo(() => {
+    const programs = new Set<string>();
+    const cabins = new Set<string>();
+    const stops = new Set<number>();
+    const routes = new Set<string>();
+    const dateStrings = new Set<string>();
+    let min = Infinity;
+    let max = 0;
+    let shortest = Infinity;
+
+    deals.forEach(deal => {
+      if (deal.duration_minutes < shortest) {
+        shortest = deal.duration_minutes;
+      }
+      stops.add((deal.stops || []).length);
+      const route = `${deal.segments[0].departureAirport} → ${deal.segments[deal.segments.length - 1].arrivalAirport}`;
+      routes.add(route);
+      dateStrings.add(deal.departure_time.substring(0, 10));
+      deal.options.forEach(option => {
+        programs.add(option.program);
+        ['economy', 'premium', 'business', 'first'].forEach(cabin => {
+          const cabinData = option[cabin as keyof BookingOption] as CabinDeal | undefined;
+          if (cabinData && cabinData.points) {
+            cabins.add(cabin.charAt(0).toUpperCase() + cabin.slice(1));
+            if (cabinData.points < min) min = cabinData.points;
+            if (cabinData.points > max) max = cabinData.points;
+          }
+        });
+      });
+    });
+
+    const sortedDateStrings = Array.from(dateStrings).sort();
+    const firstYear = sortedDateStrings.length > 0 ? new Date(sortedDateStrings[0]).getFullYear() : new Date().getFullYear();
+    const spansMultipleYears = !sortedDateStrings.every(d => new Date(d).getFullYear() === firstYear);
+
+    const formattedDates = sortedDateStrings.map(d => {
+        const date = new Date(d.replace(/-/g, '/')); // Avoid timezone issues with parsing
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: spansMultipleYears ? 'numeric' : undefined,
+        });
+    });
+
+    let finalRoutes = Array.from(routes);
+    if (userQuery && userQuery.startsWith('Find a multi-city trip for me.')) {
+        const { startLocation, intermediateStops, endLocation } = parseMultiCityMessage(userQuery);
+        const expectedLegs = [];
+        let lastStop = startLocation;
+        for (const stop of intermediateStops) {
+            expectedLegs.push(`${lastStop} → ${stop}`);
+            lastStop = stop;
+        }
+        expectedLegs.push(`${lastStop} → ${endLocation}`);
+        finalRoutes = finalRoutes.filter(route => expectedLegs.includes(route));
+    }
+
+
+    const availableStops: string[] = [];
+    if (stops.has(0)) availableStops.push('Nonstop');
+    if (stops.has(1)) availableStops.push('1 Stop');
+    if ([...stops].some(count => count >= 2)) availableStops.push('2+ Stops');
+
+    return {
+      availablePrograms: Array.from(programs).sort(),
+      minPoints: min === Infinity ? 0 : min,
+      maxPoints: max === 0 ? 100000 : max,
+      shortestDuration: shortest === Infinity ? 1 : shortest,
+      availableCabins: Array.from(cabins),
+      availableStops,
+      availableRoutes: finalRoutes,
+      availableDates: formattedDates,
+    };
+  }, [deals, userQuery]);
+
+  useEffect(() => {
+    if (availableRoutes.length > 0) {
+      setSelectedRoute(availableRoutes[0]);
+    }
+  }, [availableRoutes]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -96,57 +183,30 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
     };
   }, []);
 
-  const showDates = useMemo(() => {
-    if (deals.length <= 1) return false;
-    const firstDate = new Date(deals[0].departure_time).toDateString();
-    return !deals.every(deal => new Date(deal.departure_time).toDateString() === firstDate);
-  }, [deals]);
-
-  const { availablePrograms, minPoints, maxPoints, shortestDuration, availableCabins, availableStops } = useMemo(() => {
-    const programs = new Set<string>();
-    const cabins = new Set<string>();
-    const stops = new Set<number>();
-    let min = Infinity;
-    let max = 0;
-    let shortest = Infinity;
-
-    deals.forEach(deal => {
-      if (deal.duration_minutes < shortest) {
-        shortest = deal.duration_minutes;
-      }
-      stops.add((deal.stops || []).length);
-      deal.options.forEach(option => {
-        programs.add(option.program);
-        ['economy', 'premium', 'business', 'first'].forEach(cabin => {
-          const cabinData = option[cabin as keyof BookingOption] as CabinDeal | undefined;
-          if (cabinData && cabinData.points) {
-            cabins.add(cabin.charAt(0).toUpperCase() + cabin.slice(1));
-            if (cabinData.points < min) min = cabinData.points;
-            if (cabinData.points > max) max = cabinData.points;
-          }
-        });
-      });
-    });
-
-    const availableStops: string[] = [];
-    if (stops.has(0)) availableStops.push('Nonstop');
-    if (stops.has(1)) availableStops.push('1 Stop');
-    if ([...stops].some(count => count >= 2)) availableStops.push('2+ Stops');
-
-    return {
-      availablePrograms: Array.from(programs).sort(),
-      minPoints: min === Infinity ? 0 : min,
-      maxPoints: max === 0 ? 100000 : max,
-      shortestDuration: shortest === Infinity ? 1 : shortest,
-      availableCabins: Array.from(cabins),
-      availableStops,
-    };
-  }, [deals]);
+  const showDates = availableDates.length > 1;
 
   const filteredDeals = useMemo(() => {
     setCurrentPage(1);
     return deals.filter((deal) => {
       const { cabinClasses, airlinePrograms, stops, maxPoints } = filters;
+
+      if (selectedRoute && `${deal.segments[0].departureAirport} → ${deal.segments[deal.segments.length - 1].arrivalAirport}` !== selectedRoute) {
+        return false;
+      }
+
+      if (selectedDate !== 'all') {
+        const date = new Date(deal.departure_time.replace(/-/g, '/'));
+        const spansMultipleYears = !availableDates.every(d => new Date(d).getFullYear() === new Date(availableDates[0]).getFullYear());
+        const formattedDealDate = date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: spansMultipleYears ? 'numeric' : undefined,
+        });
+        if (formattedDealDate !== selectedDate) {
+            return false;
+        }
+      }
 
       const hasMatchingOption = deal.options.some(option => {
         if (airlinePrograms.length > 0 && !airlinePrograms.includes(option.program)) {
@@ -185,7 +245,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
 
       return true;
     });
-  }, [deals, filters]);
+  }, [deals, filters, selectedRoute, selectedDate]);
 
   const sortedDeals = useMemo(() => {
     const getDealSortValue = (deal: CompactFlightDeal, cabinFilter: string[]) => {
@@ -260,6 +320,18 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
   return (
     <>
       <div ref={sentinelRef} style={{ height: 1, width: '100%' }} />
+      {availableRoutes.length > 1 && (
+        <Tabs
+          activeKey={selectedRoute}
+          onSelect={(k) => setSelectedRoute(k || '')}
+          className="mb-3"
+          id="route-tabs"
+        >
+          {availableRoutes.map(route => (
+            <Tab eventKey={route} title={route} key={route} />
+          ))}
+        </Tabs>
+      )}
       <DealFilters
         filters={filters}
         setFilters={setFilters}
@@ -271,13 +343,16 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals }) => {
         className={isStuck ? styles.isStuck : ''}
         availableCabins={availableCabins}
         availableStops={availableStops}
+        availableDates={availableDates}
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
       />
       <div className={styles.dealsContainer}>
         {paginatedDeals.map((deal) => (
           <React.Fragment key={deal.id}>
             <DealRow
               deal={deal}
-              showDate={showDates}
+              showDate={availableDates.length > 1}
               hasCashPrice={hasAnyCashPrice}
             />
           </React.Fragment>

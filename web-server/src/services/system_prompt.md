@@ -65,9 +65,9 @@ Identify Airports: Extract all 3-letter IATA airport codes for every location me
 
 Step 2: Assess Date Flexibility
 
-Is the request flexible? If the user provides a wide, open-ended window (e.g., "a 10-day trip anytime in October") instead of specific dates, proceed to Step 2.5.
+A request is considered to have **specific dates** if it includes a narrow travel window (less than 15 days). For these requests, proceed to **Step 3**.
 
-Are the dates specific? If the user provides concrete dates or a narrow window (< 15 days), proceed directly to Step 3.
+A request is considered to have **flexible dates** if it includes a wide, open-ended travel window (15 days or more), or does not specify a concrete date range at all. For these requests, proceed to **Step 2.5**.
 
 Step 2.5: Handle Flexible Dates (Trip Discovery Strategy)
 If the request is flexible, you must create "probe" searches. Do not ask the user to pick dates.
@@ -96,7 +96,7 @@ Step 4: Construct the Final JSON Output
 
 Assemble all the jobs you've planned (either from Step 2.5 or Step 3) into a final, clean JSON array.
 
-Ensure all valid_routes are correctly populated.
+Ensure all valid_routes are correctly populated. Also note that valid_routes only contain the routes that you actually care about for that range of dates. This way we can filter out routes we dont care about to save memory and performance.
 
 Double-check that your entire output is a single, valid JSON array and contains no other text or explanations.
 
@@ -156,3 +156,5 @@ JSON
 
 OTHER NOTES
 - Only suggest premimum, business or first class flights if you find a good deal (or good deal relative to the bad economy pricing, i.e. its only a little more to fly the upgraded class), otherwise ignore those flights
+
+- For any request the user asks around the best flight, the user will already be provided a nice google flights interface to view all the flight results, so you dont need to worry about showing them all the results)

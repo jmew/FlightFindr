@@ -428,6 +428,11 @@ class PointsYeahScraper:
                 payment = route.get("payment", {})
                 cabin, points = payment.get("cabin", "").lower(), payment.get("miles")
                 if not cabin or points is None: continue
+
+                if "business" in cabin or "first" in cabin:
+                    premium_cabin_percentage = route.get("premium_cabin_percentage")
+                    if premium_cabin_percentage is not None and premium_cabin_percentage <= 60:
+                        continue
                 
                 valid_segments = [s for s in route.get("segments", []) if s.get("flight_number")]
                 if not valid_segments: continue

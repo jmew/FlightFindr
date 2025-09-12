@@ -7,10 +7,11 @@ import styles from './MessageBubble.module.css';
 
 interface MessageBubbleProps {
   msg: Message;
+  userQuery?: string;
 }
 
 const MessageBubble = React.forwardRef<HTMLDivElement, MessageBubbleProps>(
-  ({ msg }, ref) => {
+  ({ msg, userQuery }, ref) => {
     return (
       <div
         ref={ref}
@@ -20,7 +21,7 @@ const MessageBubble = React.forwardRef<HTMLDivElement, MessageBubbleProps>(
         {msg.tools && <ToolCall tools={msg.tools} />}
         {msg.flightData && msg.flightData.length > 0 && (
           <div className="flight-deals-container">
-            <FlightDeals deals={msg.flightData} />
+            <FlightDeals deals={msg.flightData} userQuery={userQuery} />
           </div>
         )}
       </div>
