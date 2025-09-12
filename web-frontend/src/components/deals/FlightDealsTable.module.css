@@ -163,3 +163,75 @@
 .cabinFees {
   color: var(--gem-sys-color--on-surface-variant);
 }
+
+@media (max-width: 768px) {
+  .dealRow {
+    display: block;
+    padding: 8px 12px;
+    position: relative;
+  }
+
+  .dealsContainer {
+    gap: 4px;
+  }
+
+  .section {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--gem-sys-color--surface);
+  }
+
+  .dealRow > .section:first-child {
+    padding-top: 0;
+  }
+
+  .dealRow > .section:nth-last-child(2) {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .section::before {
+    content: attr(data-label);
+    font-weight: 500;
+    color: var(--gem-sys-color--on-surface-variant);
+  }
+
+  .airlineInfo {
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 8px;
+  }
+
+  .airlineInfo::before,
+  .detailsToggle::before {
+    display: none;
+  }
+
+  .sectionContent {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 100%;
+  }
+
+  .time, .duration, .pointsValue {
+    font-size: 15px; /* Slightly smaller font for compact view */
+  }
+
+  .route, .stops, .fees {
+    font-size: 11px;
+  }
+
+  .detailsToggle {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 8px;
+  }
+
+  .dealRowExpandedDetails {
+    padding: 0 12px 12px 12px;
+  }
+}

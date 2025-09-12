@@ -85,7 +85,7 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
 
   return (
     <Form onSubmit={handleSubmit}>
-      <Row className="mb-3">
+      <Row className={`mb-3 ${styles.formRow}`}>
         <Col md={6}>
           <InputGroup>
             <InputGroup.Text className={styles.inputGroupText}><FaPlaneDeparture /></InputGroup.Text>
@@ -155,7 +155,7 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
         </Col>
       </Row>
 
-      <Row className="mb-3">
+      <Row className={`mb-3 ${styles.formRow}`}>
         <Col md={6}>
           <InputGroup>
             <InputGroup.Text className={styles.inputGroupText}><FaCalendarAlt /></InputGroup.Text>
@@ -198,7 +198,7 @@ const MultiCityForm: React.FC<MultiCityFormProps> = ({ handleSendMessage }) => {
         </Col>
       </Row>
 
-      <Row className="mb-3">
+      <Row className={`mb-3 ${styles.formRow}`}>
         <Col md={6}>
            <InputGroup>
             <InputGroup.Text className={styles.inputGroupText}><FaClock /></InputGroup.Text>

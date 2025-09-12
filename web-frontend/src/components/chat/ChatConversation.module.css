@@ -81,3 +81,13 @@
 .stopButton {
   background-color: #dc3545;
 }
+
+@media (max-width: 768px) {
+  .chatConversation {
+    padding: 10px 0 0 0;
+  }
+  .inputArea {
+    padding: 12px;
+    padding-bottom: 24px;
+  }
+}

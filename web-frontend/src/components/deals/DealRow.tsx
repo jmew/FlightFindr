@@ -101,59 +101,60 @@ const DealRow: React.FC<DealRowProps> = ({ deal, showDate, hasCashPrice }) => {
           />
           <span className={styles.airlineName}>{displayName}</span>
         </div>
-        <div className={`${styles.section} ${styles.timeInfo}`}>
-          {showDate && (
-            <div style={{ fontSize: '0.8em', fontFamily: 'roboto', color: 'var(--gem-sys-color--on-surface-variant)' }}>
-              {formatDate(deal.departure_time)}
+        <div className={`${styles.section} ${styles.timeInfo}`} data-label="Flight">
+          <div className={styles.sectionContent}>
+            <span className={styles.time}>
+              {departureTime} → {arrivalTime}
+              {isNextDay && <sup>+1</sup>}
+            </span>
+            <div className={styles.route}>{routeString}</div>
+          </div>
+        </div>
+        <div className={`${styles.section} ${styles.durationInfo}`} data-label="Duration">
+          <div className={styles.sectionContent}>
+            <div className={styles.duration}>
+              {formatDuration(deal.duration_minutes)}
             </div>
-          )}
-          <span className={styles.time}>
-            {departureTime} → {arrivalTime}
-            {isNextDay && <sup>+1</sup>}
-          </span>
-          <div className={styles.route}>{routeString}</div>
-        </div>
-        <div className={`${styles.section} ${styles.durationInfo}`}>
-          <div className={styles.duration}>
-            {formatDuration(deal.duration_minutes)}
-          </div>
-          <div className={styles.stops}>
-            {isDirect
-              ? 'Nonstop'
-              : `${(deal.stops || []).length} Stop${(deal.stops || []).length !== 1 ? 's' : ''}`}
-            {!isDirect && deal.overnight_layover && (
-              <span
-                title="Includes an overnight layover"
-                className={styles.overnightWarning}
-              >
-                <FiAlertTriangle />
-              </span>
-            )}
+            <div className={styles.stops}>
+              {isDirect
+                ? 'Nonstop'
+                : `${(deal.stops || []).length} Stop${(deal.stops || []).length !== 1 ? 's' : ''}`}
+              {!isDirect && deal.overnight_layover && (
+                <span
+                  title="Includes an overnight layover"
+                  className={styles.overnightWarning}
+                >
+                  <FiAlertTriangle />
+                </span>
+              )}
+            </div>
           </div>
         </div>
-        <div className={`${styles.section} ${styles.pointsInfo}`}>
-          <div className={styles.pointsValue}>
-            {bonus && (
-              <span
-                title={`Transfer Bonus: ${bonus.percentage}% from ${bonus.bank}`}
-                className={styles.transferBonusStar}
-              >
-                <FiStar />
-              </span>
-            )}
-            {program.split(' ')[0].toLowerCase() !== airlineName.split(' ')[0].toLowerCase() && (
-              <div className="tooltip-container">
-                <span style={{ color: 'var(--gem-sys-color--primary)' }}>*</span>
-                <span className="tooltip-text">Book with {program}</span>
-              </div>
-            )}
-            {points.toLocaleString()}<span style={{ fontSize: '0.5em' }}> pts</span>
+        <div className={`${styles.section} ${styles.pointsInfo}`} data-label="Cost">
+          <div className={styles.sectionContent}>
+            <div className={styles.pointsValue}>
+              {bonus && (
+                <span
+                  title={`Transfer Bonus: ${bonus.percentage}% from ${bonus.bank}`}
+                  className={styles.transferBonusStar}
+                >
+                  <FiStar />
+                </span>
+              )}
+              {program.split(' ')[0].toLowerCase() !== airlineName.split(' ')[0].toLowerCase() && (
+                <div className="tooltip-container">
+                  <span style={{ color: 'var(--gem-sys-color--primary)' }}>*</span>
+                  <span className="tooltip-text">Book with {program}</span>
+                </div>
+              )}
+              {points.toLocaleString()}<span style={{ fontSize: '0.5em' }}> pts</span>
+            </div>
+            <div className={styles.fees}>+ {fees} USD</div>
           </div>
-          <div className={styles.fees}>+ {fees} USD</div>
         </div>
         {hasCashPrice &&
           (bestCabinDeal.exact_cpp && bestCabinDeal.exact_cpp !== 'N/A' ? (
-            <div className={`${styles.section} ${styles.cppInfo}`}>
+            <div className={`${styles.section} ${styles.cppInfo}`} data-label="Value">
               <div
                 className={styles.pointsValue}
                 style={{ color: getCppColor(bestCabinDeal.exact_cpp) }}

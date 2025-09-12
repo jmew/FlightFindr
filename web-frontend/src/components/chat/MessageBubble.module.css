@@ -29,3 +29,9 @@
   display: flex;
   align-items: center;
 }
+
+@media (max-width: 768px) {
+  .message {
+    padding: 0 4px;
+  }
+}

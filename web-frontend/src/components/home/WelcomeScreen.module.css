@@ -89,15 +89,22 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .legRow {
-    display: flex;
-    flex-direction: column;
+  .welcomeTitle {
+    font-size: 2.5rem;
   }
-  .legRow > .col-md-5, .legRow > .col-md-2 {
-    width: 100%;
-    margin-bottom: 0.5rem; /* Add some space between stacked inputs */
+
+  .searchFormContainer {
+    padding: 16px;
+    margin-top: 16px;
   }
-  .legRow .text-end {
-    text-align: left !important;
+
+  .formRow > .col,
+  .formRow > [class*="col-"] {
+      margin-bottom: 1rem;
+  }
+
+  .formRow > .col:last-child,
+  .formRow > [class*="col-"]:last-child {
+      margin-bottom: 0;
   }
 }
