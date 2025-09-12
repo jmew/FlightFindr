@@ -6,6 +6,7 @@
 .itinerarySegment {
   display: flex;
   gap: 12px;
+  align-items: center;
 }
 
 .logoContainer {
@@ -19,6 +20,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  align-self: stretch;
 }
 
 .dot {
@@ -70,6 +72,9 @@
 .flightInfo {
   font-size: 0.75rem;
   color: var(--gem-sys-color--on-surface-variant);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .layover {
@@ -90,4 +95,5 @@
   align-items: center;
   gap: 4px;
   font-size: 0.8rem;
+  color: var(--gem-sys-color--warning);
 }

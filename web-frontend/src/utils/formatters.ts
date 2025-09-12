@@ -67,5 +67,8 @@ export const formatDuration = (minutes: number | undefined): string => {
   if (minutes === undefined || minutes === null) return 'N/A';
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
+  if (mins === 0) {
+    return `${hours} hr`;
+  }
   return `${hours} hr ${mins} min`;
 };

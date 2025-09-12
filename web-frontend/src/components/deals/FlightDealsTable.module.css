@@ -57,10 +57,11 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  text-align: center;
 }
 
 .overnightWarning {
-  color: #ffc107; /* A warning yellow */
+  color: var(--gem-sys-color--warning);
   display: inline-flex;
   align-items: center;
 }
@@ -287,4 +288,11 @@
   .dealRowExpandedDetails {
     padding: 0 12px 12px 12px;
   }
+}
+
+.footnote {
+  font-size: 0.75rem;
+  color: var(--gem-sys-color--on-surface-variant);
+  text-align: right;
+  margin-top: 8px;
 }

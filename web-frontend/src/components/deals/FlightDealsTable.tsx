@@ -3,6 +3,7 @@ import { Tabs, Tab } from 'react-bootstrap';
 import DealFilters from './DealFilters';
 import DealRow from './DealRow';
 import PaginationControls from './PaginationControls';
+import DateTabs from './DateTabs';
 import type { CompactFlightDeal, BookingOption, CabinDeal } from '../../types';
 import styles from './FlightDealsTable.module.css';
 import { parseMultiCityMessage } from '../../utils/message-parser';
@@ -18,6 +19,63 @@ interface ActiveFilters {
   stops: string[];
   maxPoints: number | null;
 }
+
+const dealMatchesFilters = (
+  deal: CompactFlightDeal,
+  filters: ActiveFilters,
+  selectedRoute: string,
+  selectedDate: string,
+): boolean => {
+  const { cabinClasses, airlinePrograms, stops, maxPoints } = filters;
+
+  if (selectedRoute !== 'all' && `${deal.segments[0].departureAirport} → ${deal.segments[deal.segments.length - 1].arrivalAirport}` !== selectedRoute) {
+    return false;
+  }
+
+  if (selectedDate !== 'all') {
+    if (deal.segments[0].departureTime.substring(0, 10) !== selectedDate) {
+      return false;
+    }
+  }
+
+  const hasMatchingOption = deal.options.some(option => {
+    if (airlinePrograms.length > 0 && !airlinePrograms.includes(option.program)) {
+      return false;
+    }
+
+    const hasMatchingCabin = ['economy', 'premium', 'business', 'first'].some(cabin => {
+      const cabinKey = cabin as keyof BookingOption;
+      const cabinData = option[cabinKey] as CabinDeal | undefined;
+      if (!cabinData) return false;
+
+      if (cabinClasses.length > 0 && !cabinClasses.some(c => cabin.startsWith(c.toLowerCase()))) {
+        return false;
+      }
+      if (maxPoints !== null && cabinData.points > maxPoints) {
+        return false;
+      }
+      return true;
+    });
+
+    return hasMatchingCabin;
+  });
+
+  if (!hasMatchingOption) return false;
+
+  if (stops.length > 0) {
+    const stopCount = (deal.stops || []).length;
+    const stopConditions = {
+      'Nonstop': stopCount === 0,
+      '1 Stop': stopCount === 1,
+      '2+ Stops': stopCount >= 2,
+    };
+    const matches = stops.some(stop => stopConditions[stop as keyof typeof stopConditions]);
+    if (!matches) return false;
+  }
+
+  return true;
+};
+
 
 const calculateTopFlightScore = (deal: CompactFlightDeal, cheapestPrice: number, shortestDuration: number) => {
   const weights = {
@@ -50,7 +108,7 @@ const calculateTopFlightScore = (deal: CompactFlightDeal, cheapestPrice: number,
   
 
   let timePenalty = 0;
-  const departureHour = new Date(deal.departure_time).getHours();
+  const departureHour = new Date(deal.segments[0].departureTime).getHours();
   const arrivalHour = new Date(deal.arrival_time).getHours();
   if (departureHour < 8 || departureHour > 20) {
     timePenalty += 0.5;
@@ -79,15 +137,16 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [selectedRoute, setSelectedRoute] = useState('');
+  const [selectedRoute, setSelectedRoute] = useState('all');
   const [selectedDate, setSelectedDate] = useState('all');
 
-  const { availablePrograms, minPoints, maxPoints, shortestDuration, availableCabins, availableStops, availableRoutes, availableDates } = useMemo(() => {
+  const { availablePrograms, minPoints, maxPoints, shortestDuration, availableCabins, availableStops, availableRoutes, availableDates, medianFee } = useMemo(() => {
     const programs = new Set<string>();
     const cabins = new Set<string>();
     const stops = new Set<number>();
     const routes = new Set<string>();
-    const dateStrings = new Set<string>();
+    const dateMap = new Map<string, string>();
+    const allFees: number[] = [];
     let min = Infinity;
     let max = 0;
     let shortest = Infinity;
@@ -99,7 +158,22 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
       stops.add((deal.stops || []).length);
       const route = `${deal.segments[0].departureAirport} → ${deal.segments[deal.segments.length - 1].arrivalAirport}`;
       routes.add(route);
-      dateStrings.add(deal.departure_time.substring(0, 10));
+      
+      const rawDate = deal.segments[0].departureTime.substring(0, 10);
+      if (!dateMap.has(rawDate)) {
+        const date = new Date(rawDate);
+        const firstYear = new Date(deals[0].segments[0].departureTime.substring(0, 10)).getFullYear();
+        const spansMultipleYears = !deals.every(d => new Date(d.segments[0].departureTime.substring(0, 10)).getFullYear() === firstYear);
+        const formatted = date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: spansMultipleYears ? 'numeric' : undefined,
+            timeZone: 'UTC',
+        });
+        dateMap.set(rawDate, formatted);
+      }
+
       deal.options.forEach(option => {
         programs.add(option.program);
         ['economy', 'premium', 'business', 'first'].forEach(cabin => {
@@ -108,24 +182,27 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
             cabins.add(cabin.charAt(0).toUpperCase() + cabin.slice(1));
             if (cabinData.points < min) min = cabinData.points;
             if (cabinData.points > max) max = cabinData.points;
+            const feeValue = parseFloat(cabinData.fees.replace(/[^\d.]/g, ''));
+            if (!isNaN(feeValue)) {
+              allFees.push(feeValue);
+            }
           }
         });
       });
     });
 
-    const sortedDateStrings = Array.from(dateStrings).sort();
-    const firstYear = sortedDateStrings.length > 0 ? new Date(sortedDateStrings[0]).getFullYear() : new Date().getFullYear();
-    const spansMultipleYears = !sortedDateStrings.every(d => new Date(d).getFullYear() === firstYear);
+    allFees.sort((a, b) => a - b);
+    let medianFee = 0;
+    if (allFees.length > 0) {
+      const mid = Math.floor(allFees.length / 2);
+      medianFee = allFees.length % 2 !== 0 ? allFees[mid] : (allFees[mid - 1] + allFees[mid]) / 2;
+    }
 
-    const formattedDates = sortedDateStrings.map(d => {
-        const date = new Date(d.replace(/-/g, '/')); // Avoid timezone issues with parsing
-        return date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: spansMultipleYears ? 'numeric' : undefined,
-        });
-    });
+    const sortedDates = Array.from(dateMap.keys()).sort();
+    const finalDates = sortedDates.map(raw => ({
+        raw,
+        formatted: dateMap.get(raw)!,
+    }));
 
     let finalRoutes = Array.from(routes);
     if (userQuery && userQuery.startsWith('Find a multi-city trip for me.')) {
@@ -157,17 +234,10 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
       availableCabins: Array.from(cabins),
       availableStops,
       availableRoutes: finalRoutes,
-      availableDates: formattedDates,
+      availableDates: finalDates,
+      medianFee,
     };
   }, [deals, userQuery]);
-
-  const spansMultipleDates = availableDates.length > 1;
-
-  useEffect(() => {
-    if (availableRoutes.length > 0) {
-      setSelectedRoute(availableRoutes[0]);
-    }
-  }, [availableRoutes]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -190,65 +260,53 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
 
   const filteredDeals = useMemo(() => {
     setCurrentPage(1);
-    return deals.filter((deal) => {
-      const { cabinClasses, airlinePrograms, stops, maxPoints } = filters;
+    return deals.filter((deal) => dealMatchesFilters(deal, filters, selectedRoute, selectedDate));
+  }, [deals, filters, selectedRoute, selectedDate]);
 
-      if (selectedRoute && `${deal.segments[0].departureAirport} → ${deal.segments[deal.segments.length - 1].arrivalAirport}` !== selectedRoute) {
-        return false;
-      }
-
-      if (selectedDate !== 'all') {
-        const date = new Date(deal.departure_time.replace(/-/g, '/'));
-        const spansMultipleYears = !availableDates.every(d => new Date(d).getFullYear() === new Date(availableDates[0]).getFullYear());
-        const formattedDealDate = date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: spansMultipleYears ? 'numeric' : undefined,
-        });
-        if (formattedDealDate !== selectedDate) {
-            return false;
-        }
-      }
-
-      const hasMatchingOption = deal.options.some(option => {
-        if (airlinePrograms.length > 0 && !airlinePrograms.includes(option.program)) {
-          return false;
-        }
-
-        const hasMatchingCabin = ['economy', 'premium', 'business', 'first'].some(cabin => {
+  const datesWithMinPoints = useMemo(() => {
+    const getDealMinPoints = (deal: CompactFlightDeal) => {
+      let minPoints = Infinity;
+      deal.options.forEach(option => {
+        ['economy', 'premium', 'business', 'first'].forEach(cabin => {
           const cabinKey = cabin as keyof BookingOption;
           const cabinData = option[cabinKey] as CabinDeal | undefined;
-          if (!cabinData) return false;
 
-          if (cabinClasses.length > 0 && !cabinClasses.some(c => cabin.startsWith(c.toLowerCase()))) {
-            return false;
+          if (cabinData) {
+            const cabinMatchesFilter = filters.cabinClasses.length === 0 ||
+              filters.cabinClasses.some(c => cabin.startsWith(c.toLowerCase()));
+
+            if (cabinMatchesFilter && cabinData.points < minPoints) {
+              minPoints = cabinData.points;
+            }
           }
-          if (maxPoints !== null && cabinData.points > maxPoints) {
-            return false;
-          }
-          return true;
         });
-
-        return hasMatchingCabin;
       });
+      return minPoints;
+    };
 
-      if (!hasMatchingOption) return false;
+    const dealsFilteredWithoutDate = deals.filter(deal =>
+      dealMatchesFilters(deal, filters, selectedRoute, 'all')
+    );
 
-      if (stops.length > 0) {
-        const stopCount = (deal.stops || []).length;
-        const stopConditions = {
-          'Nonstop': stopCount === 0,
-          '1 Stop': stopCount === 1,
-          '2+ Stops': stopCount >= 2,
-        };
-        const matches = stops.some(stop => stopConditions[stop as keyof typeof stopConditions]);
-        if (!matches) return false;
-      }
-
-      return true;
+    const pointsByDate = new Map<string, number>();
+    availableDates.forEach(({ raw }) => {
+      pointsByDate.set(raw, Infinity);
     });
-  }, [deals, filters, selectedRoute, selectedDate]);
+
+    dealsFilteredWithoutDate.forEach(deal => {
+      const rawDealDate = deal.segments[0].departureTime.substring(0, 10);
+      const dealPoints = getDealMinPoints(deal);
+      if (dealPoints < (pointsByDate.get(rawDealDate) || Infinity)) {
+        pointsByDate.set(rawDealDate, dealPoints);
+      }
+    });
+
+    return availableDates.map(({ raw, formatted }) => ({
+      date: formatted,
+      rawDate: raw,
+      points: pointsByDate.get(raw) === Infinity ? null : pointsByDate.get(raw)!,
+    }));
+  }, [deals, filters, selectedRoute, availableDates]);
 
   const sortedDeals = useMemo(() => {
     const getDealSortValue = (deal: CompactFlightDeal, cabinFilter: string[]) => {
@@ -303,6 +361,14 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
     });
   }, [filteredDeals, sortBy, minPoints, shortestDuration, filters.cabinClasses]);
 
+  const showDateInDealRow = useMemo(() => {
+    if (sortedDeals.length <= 1) {
+      return false;
+    }
+    const firstDate = sortedDeals[0].segments[0].departureTime.substring(0, 10);
+    return !sortedDeals.every(deal => deal.segments[0].departureTime.substring(0, 10) === firstDate);
+  }, [sortedDeals]);
+
   const paginatedDeals = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -320,21 +386,40 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
     });
   }, [sortedDeals]);
 
+  const cheapestDate = useMemo(() => {
+    let cheapestDate: string | null = null;
+    let minPoints = Infinity;
+    datesWithMinPoints.forEach(date => {
+      if (date.points !== null && date.points < minPoints) {
+        minPoints = date.points;
+        cheapestDate = date.rawDate;
+      }
+    });
+    return cheapestDate;
+  }, [datesWithMinPoints]);
+
   return (
     <>
       <div ref={sentinelRef} style={{ height: 1, width: '100%' }} />
       {availableRoutes.length > 1 && (
         <Tabs
           activeKey={selectedRoute}
-          onSelect={(k) => setSelectedRoute(k || '')}
+          onSelect={(k) => setSelectedRoute(k || 'all')}
           className={`mb-3 ${styles.routeTabs}`}
           id="route-tabs"
         >
+          <Tab eventKey="all" title="All Routes" />
           {availableRoutes.map(route => (
             <Tab eventKey={route} title={route} key={route} />
           ))}
         </Tabs>
       )}
+      <DateTabs
+        dates={datesWithMinPoints}
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+        cheapestDate={cheapestDate}
+      />
       <DealFilters
         filters={filters}
         setFilters={setFilters}
@@ -346,9 +431,6 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
         className={isStuck ? styles.isStuck : ''}
         availableCabins={availableCabins}
         availableStops={availableStops}
-        availableDates={availableDates}
-        selectedDate={selectedDate}
-        onDateChange={setSelectedDate}
       />
       <div className={styles.dealsContainer}>
         {paginatedDeals.map((deal) => (
@@ -356,7 +438,8 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
             <DealRow
               deal={deal}
               hasCashPrice={hasAnyCashPrice}
-              showDate={spansMultipleDates}
+              showDate={showDateInDealRow}
+              medianFee={medianFee}
             />
           </React.Fragment>
         ))}
@@ -368,6 +451,9 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
         onPageChange={setCurrentPage}
         onItemsPerPageChange={setItemsPerPage}
       />
+      <div className={styles.footnote}>
+        * To streamline your search, the lowest-scoring 40% of deals have been omitted.
+      </div>
     </>
   );
 };

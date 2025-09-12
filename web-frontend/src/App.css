@@ -7,6 +7,9 @@
   --gem-sys-color--surface-container: #2d2d2f;
   --gem-sys-color--primary: #8ab4f8;
   --gem-sys-color--on-surface-variant: #c4c7c5;
+  --gem-sys-color--positive: #81c995;
+  --gem-sys-color--negative: #f28b82;
+  --gem-sys-color--warning: #ffc107;
   --gem-sys-spacing--s: 12px;
   --gem-sys-spacing--m: 16px;
   --gem-sys-spacing--l: 24px;

@@ -1,0 +1,56 @@
+.tabsContainer {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  overflow-x: auto;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.tabsContainer::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background-color: var(--gem-sys-color--surface-container);
+  border: 1px solid var(--gem-sys-color--surface-container-highest);
+  color: var(--gem-sys-color--on-surface-variant);
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+  font-family: 'Google Sans', sans-serif;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background-color: var(--gem-sys-color--surface-container-high);
+}
+
+.tab.active {
+  background-color: #3c4a68;
+  border-color: var(--gem-sys-color--primary);
+  color: var(--gem-sys-color--on-surface);
+}
+
+.date {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.points {
+  font-size: 0.75rem;
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
+.points.cheapest {
+  color: var(--gem-sys-color--positive);
+  font-weight: 700;
+}

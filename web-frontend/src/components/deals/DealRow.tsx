@@ -17,36 +17,38 @@ interface DealRowProps {
   deal: CompactFlightDeal;
   hasCashPrice: boolean;
   showDate?: boolean;
+  medianFee: number;
 }
 
-const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice, showDate }) => {
+const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice, showDate, medianFee }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const bestDeal = useMemo(() => {
     let bestCabinDeal: CabinDeal | undefined;
     let bestOption: BookingOption | undefined;
+    let bestCabinName: string | undefined;
 
     deal.options.forEach(option => {
-      ['economy', 'premium', 'business', 'first'].forEach(cabin => {
-        const cabinKey = cabin as keyof BookingOption;
-        const cabinData = option[cabinKey] as CabinDeal | undefined;
+      (['economy', 'premium', 'business', 'first'] as const).forEach(cabin => {
+        const cabinData = option[cabin];
         if (cabinData) {
           if (!bestCabinDeal || cabinData.points < bestCabinDeal.points) {
             bestCabinDeal = cabinData;
             bestOption = option;
+            bestCabinName = cabin;
           }
         }
       });
     });
 
-    return { bestCabinDeal, bestOption };
+    return { bestCabinDeal, bestOption, bestCabinName };
   }, [deal]);
 
   if (!bestDeal.bestCabinDeal || !bestDeal.bestOption) {
     return null;
   }
 
-  const { bestCabinDeal, bestOption } = bestDeal;
+  const { bestCabinDeal, bestOption, bestCabinName } = bestDeal;
   const { points, fees, bonus } = bestCabinDeal;
   const { program } = bestOption;
 
@@ -71,6 +73,7 @@ const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice, showDate }) => {
   const getDisplayName = (name: string) => {
     if (name === 'American Airlines') return 'American';
     if (name === 'Alaska Airlines') return 'Alaska';
+    if (name === 'Delta Air Lines') return 'Delta';
     return name;
   };
 
@@ -83,8 +86,8 @@ const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice, showDate }) => {
 
   const getCppColor = (cpp: number | string) => {
     if (typeof cpp === 'string') return 'inherit';
-    if (cpp > 1.2) return '#81c995';
-    if (cpp < 1) return '#f28b82';
+    if (cpp > 1.2) return 'var(--gem-sys-color--positive)';
+    if (cpp < 1) return 'var(--gem-sys-color--negative)';
     return 'inherit';
   };
 
@@ -152,7 +155,14 @@ const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice, showDate }) => {
               )}
               {points.toLocaleString()}<span style={{ fontSize: '0.5em' }}> pts</span>
             </div>
-            <div className={styles.fees}>+ {fees} USD</div>
+            <div 
+              className={styles.fees}
+              style={{
+                color: parseFloat(fees.replace(/[^\d.]/g, '')) > medianFee * 1.5 ? 'rgb(242, 139, 130)' : 'inherit'
+              }}
+            >
+              + ${fees} USD
+            </div>
           </div>
         </div>
         {hasCashPrice &&
@@ -178,58 +188,80 @@ const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice, showDate }) => {
       {isExpanded && (
         <div className={styles.dealRowExpandedDetails}>
           <div className={itineraryStyles.itineraryContainer}>
-            {deal.segments.map((segment, index) => (
-              <React.Fragment key={index}>
-                <div className={itineraryStyles.itinerarySegment}>
-                  <div className={itineraryStyles.logoContainer}>
-                    <Logo type="airline" code={segment.airlineCode} name={getAirlineNameByCode(segment.airlineCode)} />
-                  </div>
-                  <div className={itineraryStyles.timeline}>
-                    <div className={itineraryStyles.dot}></div>
-                    <div className={itineraryStyles.line}></div>
-                    <div className={itineraryStyles.dot}></div>
-                  </div>
-                  <div className={itineraryStyles.legDetails}>
-                    <div className={itineraryStyles.timeAndAirport}>
-                      <span className={itineraryStyles.time}>{formatTime(segment.departureTime)}</span>
-                      <span>·</span>
-                      <span className={itineraryStyles.airport}>
-                        {aircodes.getAirportByIata(segment.departureAirport)?.name || segment.departureAirport} ({segment.departureAirport})
-                      </span>
+            {deal.segments.map((segment, index) => {
+              const firstSegmentDepartureDate = deal.segments[0].departureTime.substring(0, 10);
+              const nextSegment = deal.segments[index + 1];
+              let showLayoverDate = false;
+              if (nextSegment) {
+                const nextSegmentDepartureDate = nextSegment.departureTime.substring(0, 10);
+                if (nextSegmentDepartureDate !== firstSegmentDepartureDate) {
+                  showLayoverDate = true;
+                }
+              }
+
+              return (
+                <React.Fragment key={index}>
+                  <div className={itineraryStyles.itinerarySegment}>
+                    <div className={itineraryStyles.logoContainer}>
+                      <Logo type="airline" code={segment.airlineCode} name={getAirlineNameByCode(segment.airlineCode)} />
                     </div>
-                    <div className={itineraryStyles.travelTime}>
-                      <span>Travel time: {formatDuration(segment.durationMinutes)}</span>
-                      {segment.isOvernight && (
-                        <span className={itineraryStyles.overnight}>
-                          <FiAlertTriangle />
-                          Overnight
+                    <div className={itineraryStyles.timeline}>
+                      <div className={itineraryStyles.dot}></div>
+                      <div className={itineraryStyles.line}></div>
+                      <div className={itineraryStyles.dot}></div>
+                    </div>
+                    <div className={itineraryStyles.legDetails}>
+                      <div className={itineraryStyles.timeAndAirport}>
+                        <span className={itineraryStyles.time}>{formatTime(segment.departureTime)}</span>
+                        <span>·</span>
+                        <span className={itineraryStyles.airport}>
+                          {aircodes.getAirportByIata(segment.departureAirport)?.name || segment.departureAirport} ({segment.departureAirport})
                         </span>
-                      )}
+                      </div>
+                      <div className={itineraryStyles.travelTime}>
+                        <span>Travel time: {formatDuration(segment.durationMinutes)}</span>
+                        {bestCabinName && (
+                          <>
+                            <span>·</span>
+                            <span className={itineraryStyles.cabin}>{bestCabinName.charAt(0).toUpperCase() + bestCabinName.slice(1)}</span>
+                          </>
+                        )}
+                        {segment.isOvernight && (
+                          <>
+                            <span>·</span>
+                            <span className={itineraryStyles.overnight}>
+                              <FiAlertTriangle />
+                              Overnight
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div className={itineraryStyles.timeAndAirport}>
+                        <span className={itineraryStyles.time}>
+                          {formatTime(segment.arrivalTime)}
+                          {segment.arrivalDayDiff && <sup>+{segment.arrivalDayDiff}</sup>}
+                        </span>
+                        <span>·</span>
+                        <span className={itineraryStyles.airport}>
+                          {aircodes.getAirportByIata(segment.arrivalAirport)?.name || segment.arrivalAirport} ({segment.arrivalAirport})
+                        </span>
+                      </div>
                     </div>
-                    <div className={itineraryStyles.timeAndAirport}>
-                      <span className={itineraryStyles.time}>
-                        {formatTime(segment.arrivalTime)}
-                        {segment.arrivalDayDiff && <sup>+{segment.arrivalDayDiff}</sup>}
-                      </span>
-                      <span>·</span>
-                      <span className={itineraryStyles.airport}>
-                        {aircodes.getAirportByIata(segment.arrivalAirport)?.name || segment.arrivalAirport} ({segment.arrivalAirport})
-                      </span>
+                    <div className={itineraryStyles.flightInfo}>
+                      <div>{getAirlineNameByCode(segment.airlineCode)}</div>
+                      <div>{segment.flightNumber}</div>
                     </div>
                   </div>
-                  <div className={itineraryStyles.flightInfo}>
-                      {getAirlineNameByCode(segment.airlineCode)} · {segment.flightNumber}
-                  </div>
-                </div>
-                {segment.layoverMinutes && (
-                  <div className={itineraryStyles.layover}>
-                    <div className={itineraryStyles.layoverContent}>
-                      {formatDuration(segment.layoverMinutes)} layover · {aircodes.getAirportByIata(segment.arrivalAirport)?.name || segment.arrivalAirport} ({segment.arrivalAirport})
+                  {segment.layoverMinutes && (
+                    <div className={itineraryStyles.layover}>
+                      <div className={itineraryStyles.layoverContent}>
+                        {formatDuration(segment.layoverMinutes)} layover · {aircodes.getAirportByIata(segment.arrivalAirport)?.city || segment.arrivalAirport} ({segment.arrivalAirport})
+                      </div>
                     </div>
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
           <div className={styles.bookingOptionsContainer}>
             {deal.options.map(option => (
