@@ -31,6 +31,7 @@ class FlightSearchMCP(FastMCP):
     def __init__(self):
         super().__init__()
         self.scraper: Optional[PointsYeahScraper] = None
+        self.current_search_task: Optional[asyncio.Task] = None
         
         self.add_tool(Tool.from_function(
             self.check_flight_points_prices,
@@ -56,7 +57,7 @@ Schema for a 'multicity' job (two distinct legs):
         ))
 
     async def check_flight_points_prices(
-        self,
+        self, 
         jobs: List[Dict[str, Any]],
     ) -> str:
         """
@@ -68,6 +69,7 @@ Schema for a 'multicity' job (two distinct legs):
         if not isinstance(jobs, list):
              return json.dumps({"error": "Invalid input, 'jobs' must be a list of job objects."})
 
+        self.current_search_task = asyncio.current_task()
         try:
             # Validate input with Pydantic
             validated_jobs = []
@@ -80,8 +82,13 @@ Schema for a 'multicity' job (two distinct legs):
                     raise ValueError(f"Unknown job_type: {job.get('job_type')}")
             
             return await self.scraper.search_flights(validated_jobs)
+        except asyncio.CancelledError:
+            print("Search task cancelled.")
+            return json.dumps({"error": "Search cancelled."})
         except (ValidationError, ValueError) as e:
             return json.dumps({"error": f"Invalid job object: {e}"})
+        finally:
+            self.current_search_task = None
 
 mcp_server = FlightSearchMCP()
 
@@ -95,6 +102,11 @@ async def startup_event():
 async def shutdown_event():
     """Closes the scraper instance."""
     print("Executing shutdown event...")
+    if mcp_server.current_search_task:
+        print("Cancelling active search task...")
+        mcp_server.current_search_task.cancel()
+        await asyncio.sleep(0) # Allow cancellation to propagate
+
     if mcp_server.scraper:
         await mcp_server.scraper.close()
     print("Shutdown event complete.")
@@ -116,6 +128,7 @@ async def main_async(args):
     app = mcp_server.http_app()
     config = uvicorn.Config(app, host="0.0.0.0", port=9999, log_level="info", timeout_keep_alive=300)
     server = uvicorn.Server(config)
+    server.install_signal_handlers = lambda: None # Disable uvicorn's signal handling
     
     try:
         await server.serve()

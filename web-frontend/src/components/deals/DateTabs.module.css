@@ -4,12 +4,36 @@
   margin-bottom: 16px;
   padding-bottom: 8px;
   overflow-x: auto;
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  
+  /* Firefox: scrollbar is transparent by default */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s ease-out;
 }
 
+/* Firefox: show scrollbar on hover */
+.tabsContainer:hover {
+  scrollbar-color: var(--gem-sys-color--surface-container-highest) transparent;
+}
+
+/* WebKit (Chrome, Safari, Edge): hide scrollbar by default */
 .tabsContainer::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
+  height: 8px;
+}
+
+.tabsContainer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tabsContainer::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 4px;
+  transition: background-color 0.3s ease-out;
+}
+
+/* WebKit: show scrollbar on hover */
+.tabsContainer:hover::-webkit-scrollbar-thumb {
+  background-color: var(--gem-sys-color--surface-container-highest);
 }
 
 

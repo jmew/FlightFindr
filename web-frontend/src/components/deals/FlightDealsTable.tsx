@@ -125,9 +125,14 @@ const calculateTopFlightScore = (deal: CompactFlightDeal, cheapestPrice: number,
   );
 };
 
+interface MinDeal {
+  points: number;
+  fees: number;
+}
+
 const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery }) => {
   const [filters, setFilters] = useState<ActiveFilters>({
-    cabinClasses: ['Economy'],
+    cabinClasses: [],
     airlinePrograms: [],
     stops: [],
     maxPoints: null,
@@ -140,13 +145,14 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
   const [selectedRoute, setSelectedRoute] = useState('all');
   const [selectedDate, setSelectedDate] = useState('all');
 
-  const { availablePrograms, minPoints, maxPoints, shortestDuration, availableCabins, availableStops, availableRoutes, availableDates, medianFee } = useMemo(() => {
+  const { availablePrograms, minPoints, maxPoints, shortestDuration, availableCabins, availableStops, availableRoutes, availableDates, medianFee, minDealPerCabin } = useMemo(() => {
     const programs = new Set<string>();
     const cabins = new Set<string>();
     const stops = new Set<number>();
     const routes = new Set<string>();
     const dateMap = new Map<string, string>();
     const allFees: number[] = [];
+    const minDealPerCabin: Record<string, MinDeal> = {};
     let min = Infinity;
     let max = 0;
     let shortest = Infinity;
@@ -179,12 +185,17 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
         ['economy', 'premium', 'business', 'first'].forEach(cabin => {
           const cabinData = option[cabin as keyof BookingOption] as CabinDeal | undefined;
           if (cabinData && cabinData.points) {
-            cabins.add(cabin.charAt(0).toUpperCase() + cabin.slice(1));
+            const cabinName = cabin.charAt(0).toUpperCase() + cabin.slice(1);
+            cabins.add(cabinName);
             if (cabinData.points < min) min = cabinData.points;
             if (cabinData.points > max) max = cabinData.points;
             const feeValue = parseFloat(cabinData.fees.replace(/[^\d.]/g, ''));
             if (!isNaN(feeValue)) {
               allFees.push(feeValue);
+            }
+
+            if (!minDealPerCabin[cabinName] || cabinData.points < minDealPerCabin[cabinName].points) {
+              minDealPerCabin[cabinName] = { points: cabinData.points, fees: feeValue };
             }
           }
         });
@@ -236,6 +247,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
       availableRoutes: finalRoutes,
       availableDates: finalDates,
       medianFee,
+      minDealPerCabin,
     };
   }, [deals, userQuery]);
 
@@ -431,6 +443,7 @@ const FlightDealsTable: React.FC<FlightDealsTableProps> = ({ deals, userQuery })
         className={isStuck ? styles.isStuck : ''}
         availableCabins={availableCabins}
         availableStops={availableStops}
+        minDealPerCabin={minDealPerCabin}
       />
       <div className={styles.dealsContainer}>
         {paginatedDeals.map((deal) => (

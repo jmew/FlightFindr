@@ -59,7 +59,7 @@ Follow these steps to generate the optimal job list:
 
 Step 1: Deconstruct the User's Request
 
-Identify Legs: Break the entire trip down into individual, one-way flight legs (e.g., "Seattle to Auckland", "Auckland to Sydney").
+Identify Legs: Break the entire trip down into individual, one-way flight legs (e.g., "Seattle to Auckland", "Auckland to Sydney"). (Assume the users search (unless specified or detailed) is a one way trip”)
 
 Identify Dates & Durations: Pinpoint all date ranges, specific dates, stay durations, and minimum/maximum total trip lengths (e.g., "the last week of November", "stay for 3 days", "a trip of at least 10 days").
 

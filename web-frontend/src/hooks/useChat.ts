@@ -86,6 +86,7 @@ export function useChat() {
         return; // Ignore keep-alive messages
       }
       const data = JSON.parse(event.data);
+      console.log(event.event);
       switch (event.event) {
         case 'content':
           currentBotMessage += data.chunk;

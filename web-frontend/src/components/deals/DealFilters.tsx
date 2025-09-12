@@ -9,6 +9,11 @@ const SORT_OPTIONS = [
   { value: 'fees', label: 'Fees (Lowest)' },
 ];
 
+interface MinDeal {
+  points: number;
+  fees: number;
+}
+
 interface DealFiltersProps {
   filters: {
     cabinClasses: string[];
@@ -24,6 +29,7 @@ interface DealFiltersProps {
   maxPoints: number;
   availableCabins: string[];
   availableStops: string[];
+  minDealPerCabin: Record<string, MinDeal>;
   className?: string;
 }
 
@@ -37,6 +43,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
   maxPoints,
   availableCabins,
   availableStops,
+  minDealPerCabin,
   className,
 }) => {
   const [currentMax, setCurrentMax] = useState(filters.maxPoints || maxPoints);
@@ -86,6 +93,35 @@ const DealFilters: React.FC<DealFiltersProps> = ({
     setCurrentMax(maxPoints);
   }
 
+  const formatNumber = (num: number) => {
+    // This will be a string. If it ends with .0, remove it.
+    const fixed = num.toFixed(1);
+    if (fixed.endsWith('.0')) {
+      return fixed.substring(0, fixed.length - 2);
+    }
+    return fixed;
+  }
+
+  const getCabinOption = (cabin: string) => {
+    const minDeal = minDealPerCabin[cabin];
+    const value = cabin;
+    let label: React.ReactNode = cabin;
+
+    if (minDeal) {
+      const formattedPoints = formatNumber(minDeal.points / 1000);
+      const formattedFees = formatNumber(minDeal.fees);
+      label = (
+        <span>
+          {cabin} - from <b style={{ color: 'var(--gem-sys-color--primary)' }}>{formattedPoints}k</b> pts + ${formattedFees}
+        </span>
+      );
+    }
+    return { value, label };
+  };
+
+  const cabinOptions = ['Economy', 'Premium', 'Business', 'First'].map(getCabinOption);
+  const availableCabinOptions = availableCabins.map(getCabinOption);
+
   const filtersConfig = [
     {
       id: 'stops',
@@ -110,12 +146,14 @@ const DealFilters: React.FC<DealFiltersProps> = ({
     {
       id: 'cabins',
       label: 'Cabins',
-      options: ['Economy', 'Premium', 'Business', 'First'],
+      options: cabinOptions,
       selectedOptions: filters.cabinClasses,
-      onChange: (selected: string[]) => handleFilterChange('cabinClasses', selected),
+      onChange: (selected: string[]) => {
+        handleFilterChange('cabinClasses', selected);
+      },
       onClear: () => handleFilterChange('cabinClasses', []),
       isActive: filters.cabinClasses.length > 0,
-      availableOptions: availableCabins,
+      availableOptions: availableCabinOptions,
     },
     {
       id: 'price',
@@ -166,8 +204,7 @@ const DealFilters: React.FC<DealFiltersProps> = ({
     <div className={`${styles.dealFiltersContainer} ${className || ''}`}>
       <div
         ref={scrollContainerRef}
-        className={`${styles.filterChipsScrollContainer} ${isScrollable ? styles.isScrollable : ''}`}
-      >
+        className={`${styles.filterChipsScrollContainer} ${isScrollable ? styles.isScrollable : ''}`}>
         {inactiveFilters.map(filter => (
           <FilterChip key={filter.id} {...filter} />
         ))}
