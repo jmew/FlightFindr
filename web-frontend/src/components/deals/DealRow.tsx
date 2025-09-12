@@ -191,12 +191,12 @@ const DealRow: React.FC<DealRowProps> = ({ deal, hasCashPrice, showDate, medianF
             {deal.segments.map((segment, index) => {
               const firstSegmentDepartureDate = deal.segments[0].departureTime.substring(0, 10);
               const nextSegment = deal.segments[index + 1];
-              let showLayoverDate = false;
+              // let showLayoverDate = false;
               if (nextSegment) {
                 const nextSegmentDepartureDate = nextSegment.departureTime.substring(0, 10);
-                if (nextSegmentDepartureDate !== firstSegmentDepartureDate) {
-                  showLayoverDate = true;
-                }
+                // if (nextSegmentDepartureDate !== firstSegmentDepartureDate) {
+                //   showLayoverDate = true;
+                // }
               }
 
               return (
