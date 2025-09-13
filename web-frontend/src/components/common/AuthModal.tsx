@@ -12,12 +12,11 @@ interface AuthModalProps {
 const AuthModal: React.FC<AuthModalProps> = ({ show, onClose, onAuthSuccess }) => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // IMPORTANT: Check the origin of the message for security
-      // In development, this might be different if the Vite server and backend are on different ports.
-      // In production, this should be the origin of your frontend.
-      // For simplicity here, we might be less strict, but in a real app, be very careful.
-      if (event.origin !== window.location.origin && (import.meta.env.PROD || !event.origin.startsWith('http://localhost'))) {
-        console.warn(`Ignoring message from unexpected origin: ${event.origin}`);
+      const expectedOrigin = new URL(API_BASE_URL).origin;
+      
+      // Only accept messages from the backend server
+      if (event.origin !== expectedOrigin) {
+        console.warn(`Ignoring message from unexpected origin: ${event.origin}. Expected: ${expectedOrigin}`);
         return;
       }
 
