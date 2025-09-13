@@ -38,7 +38,7 @@ const App: React.FC = () => {
     handleFormSubmit,
     handleSendMessage,
     handleStop,
-  } = useChat({ isAuthenticated, onAuthRequired: handleAuthRequired, onAuthSuccess: handleAuthSuccess });
+  } = useChat({ isAuthenticated, onAuthRequired: handleAuthRequired });
 
   // Effect to handle the post-login action
   useEffect(() => {
