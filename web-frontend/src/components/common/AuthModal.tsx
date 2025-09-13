@@ -12,11 +12,14 @@ interface AuthModalProps {
 const AuthModal: React.FC<AuthModalProps> = ({ show, onClose, onAuthSuccess }) => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      const expectedOrigin = new URL(API_BASE_URL).origin;
+      const normalizeUrl = (url: string) => url.endsWith('/') ? url.slice(0, -1) : url;
       
+      const expectedOrigin = normalizeUrl(new URL(API_BASE_URL).origin);
+      const receivedOrigin = normalizeUrl(event.origin);
+
       // Only accept messages from the backend server
-      if (event.origin !== expectedOrigin) {
-        console.warn(`Ignoring message from unexpected origin: ${event.origin}. Expected: ${expectedOrigin}`);
+      if (receivedOrigin !== expectedOrigin) {
+        console.warn(`Ignoring message from unexpected origin: ${receivedOrigin}. Expected: ${expectedOrigin}`);
         return;
       }
 
