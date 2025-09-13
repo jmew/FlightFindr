@@ -27,7 +27,7 @@ steps:
     - '--allow-unauthenticated'
     - '--port=3000'
     - '--timeout=300s'
-    - '--set-env-vars=MCP_URL=https://mcp-server-304334704110.us-central1.run.app/mcp,NODE_ENV=production'
+    - '--set-env-vars=MCP_URL=https://mcp-server-304334704110.us-central1.run.app/mcp,NODE_ENV=production,BACKEND_BASE_URL=https://web-server-304334704110.us-central1.run.app,FRONTEND_BASE_URL=https://jmew.github.io/FlightFindr/'
 
 images:
 - 'us-central1-docker.pkg.dev/dazzling-lodge-470804-e6/flight-findr-repo/web-server:latest'
