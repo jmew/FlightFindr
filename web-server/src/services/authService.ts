@@ -11,10 +11,9 @@ import * as path from 'path';
 import { promises as fs } from 'fs';
 import open from 'open';
 
-// These constants are copied from the Gemini CLI core files.
 const OAUTH_CLIENT_ID =
-  '681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com';
-const OAUTH_CLIENT_SECRET = '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';
+  '304334704110-1cs4bm3etic6t9ahtg79inthpva80brn.apps.googleusercontent.com';
+const OAUTH_CLIENT_SECRET = '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';
 const OAUTH_SCOPE = [
   'https://www.googleapis.com/auth/cloud-platform',
   'https://www.googleapis.com/auth/userinfo.email',
