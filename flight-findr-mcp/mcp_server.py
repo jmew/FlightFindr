@@ -50,6 +50,7 @@ def truncate_deals_if_needed(deals_json: str) -> str:
     """Checks token count and truncates deals to fit the token limit using a binary search approach."""
     try:
         initial_token_count = count_tokens(deals_json)
+        print(f"Tokens used: {initial_token_count}")
         if initial_token_count <= TOKEN_LIMIT:
             return deals_json
 

@@ -12,9 +12,9 @@ load_dotenv()
 LEGEND = {
     "field_order": {
         "deal": ["segments", "options", "duration_minutes"],
-        "segment": ["flight_number", "dep_airport", "arr_airport", "dep_time", "arr_time"],
-        "option": ["program", "transfer_partners", "booking_url", "cabins"],
-        "cabin_deal": ["points", "tax", "cash_price?", "cpp?"]
+        "segment": ["flight_number", "dep_airport", "arr_airport", "dep_timestamp", "arr_timestamp"],
+        "option": ["program", "transfer_partners", "cabins"],
+        "cabin_deal": ["cabin_code", "points", "tax", "cash_price?", "cpp?"]
     },
     "programs": {
         "EY": "Etihad Guest", "VA": "Virgin Australia Velocity", "AS": "Alaska Atmos Rewards", 
@@ -28,23 +28,11 @@ LEGEND = {
         "AA": "American Airlines Aadvantage"
     },
     "banks": {
-        "amex": "Amex Rewards", "c1": "Capital One", "citi": "Citi Points", 
-        "bilt": "Bilt", "chase": "Chase UR"
+        "ax": "Amex Rewards", "co": "Capital One", "ct": "Citi Points", 
+        "bt": "Bilt", "ch": "Chase UR"
     },
     "cabin_codes": {
         "Y": "Economy", "W": "Premium Economy", "J": "Business", "F": "First"
-    },
-    "booking_urls": {
-        "EY": "https://digital.etihad.com/book/search?{params}",
-        "AS": "https://www.alaskaair.com/search/results?{params}",
-        "VA": "https://book.virginaustralia.com/dx/VADX/#/flight-selection?{params}",
-        "UA": "https://www.united.com/en/us/fsr/choose-flights?{params}",
-        "BA": "https://www.britishairways.com/travel/redeem/execclub/_gf/en_us?{params}",
-        "AC": "https://www.aircanada.com/aeroplan/redeem/availability/outbound?{params}",
-        "KL": "https://www.klm.com/flight-search/search-results?{params}",
-        "VS": "https://flywith.virginatlantic.com/gb/en/reward-flights-search/results/outbound?{params}",
-        "AA": "https://www.aa.com/booking/search?{params}",
-        "QF": "https://www.qantas.com/au/en/book-a-trip/flights.html?{params}"
     }
 }
 

@@ -143,11 +143,20 @@ class PointsYeahScraper:
                     if program_code not in existing_options:
                         existing_options[program_code] = option_data
                     else:
+                        # Merge cabin data
                         existing_cabins = existing_options[program_code]['cabins']
                         new_cabins = option_data['cabins']
-                        for cabin_code, cabin_deal in new_cabins.items():
-                            if cabin_code not in existing_cabins or cabin_deal[0] < existing_cabins[cabin_code][0]:
-                                existing_cabins[cabin_code] = cabin_deal
+                        
+                        # Create a dictionary from the existing list for quick lookups
+                        existing_cabins_dict = {c[0]: c for c in existing_cabins}
+                        
+                        for new_cabin_deal in new_cabins:
+                            cabin_code = new_cabin_deal[0]
+                            if cabin_code not in existing_cabins_dict or new_cabin_deal[1] < existing_cabins_dict[cabin_code][1]:
+                                existing_cabins_dict[cabin_code] = new_cabin_deal
+                        
+                        # Convert back to a sorted list
+                        existing_options[program_code]['cabins'] = sorted(existing_cabins_dict.values(), key=lambda x: x[0])
         
         all_deals_dict = self._filter_deals_by_points(all_deals_dict)
         all_deals_dict = self._apply_composite_score_filter(all_deals_dict)
@@ -160,19 +169,18 @@ class PointsYeahScraper:
 
         final_deals = []
         for segments, (duration, program_options) in all_deals_dict.items():
-            options_list = [
-                [
+            options_list = []
+            for option_data in program_options.values():
+                # Sort cabins by code ('F', 'J', 'W', 'Y') before adding
+                sorted_cabins = sorted(option_data['cabins'], key=lambda x: ('F', 'J', 'W', 'Y').index(x[0]))
+                options_list.append([
                     option_data['program'],
                     option_data['transfer_partners'],
-                    option_data['booking_url'],
-                    option_data['cabins']
-                ] for option_data in program_options.values()
-            ]
+                    sorted_cabins
+                ])
             final_deals.append([list(segments), options_list, duration])
 
         result = {"legend": self.LEGEND, "deals": final_deals}
-        if "booking_urls" in result["legend"]:
-            del result["legend"]["booking_urls"]
         return json.dumps(result, indent=2)
 
     async def _scrape_matrix_search(self, context: Any, job: Dict[str, Any]) -> Dict[Any, Any]:
@@ -373,56 +381,38 @@ class PointsYeahScraper:
             flight_number = s.get('flight_number')
             da = s.get('da')
             aa = s.get('aa')
-            dt = s.get('dt')
-            at = s.get('at')
+            dt_str = s.get('dt')
+            at_str = s.get('at')
+
+            # Convert to Unix timestamp
+            dt_timestamp = int(datetime.fromisoformat(dt_str).timestamp()) if dt_str else None
+            at_timestamp = int(datetime.fromisoformat(at_str).timestamp()) if at_str else None
 
             segment_tuple = (
                 flight_number, da, aa,
-                dt, at
+                dt_timestamp, at_timestamp
             )
             segments_data.append(segment_tuple)
         return tuple(segments_data)
 
     def _get_booking_option(self, route: Dict[str, Any], program_code: str) -> Dict[str, Any]:
-        URL_PARAM_MAP = {
-            'tripType': 't', 'departure': 'd', 'arrival': 'a', 'departDate': 'dd',
-            'departDateSec': 'dds', 'multiday': 'md', 'departure2': 'd2', 'arrival2': 'a2',
-            'departDate2': 'dd2', 'departDateSec2': 'dds2', 'cabins': 'cs', 'cabin': 'c',
-            'banks': 'bs', 'airlineProgram': 'ap', 'adults': 'as', 'children': 'ch'
-        }
-
         bank_legend_short = {
-            "Chase Ultimate Rewards": "chase",
-            "American Exp Membership Rewards": "amex",
-            "Capital One": "c1",
-            "Citi Thank You Points": "citi",
-            "Bilt": "bilt"
+            "Chase Ultimate Rewards": "ch",
+            "American Exp Membership Rewards": "ax",
+            "Capital One": "co",
+            "Citi Thank You Points": "ct",
+            "Bilt": "bt"
         }
         transfer_info_raw = route.get("transfer") or []
         transfer_partners = sorted([
             bank_legend_short.get(t.get("bank")) for t in transfer_info_raw 
             if t.get("bank") and bank_legend_short.get(t.get("bank"))
         ])
-        
-        booking_url = route.get("url", "")
-        if '?' in booking_url:
-            base_url, url_params_str = booking_url.split('?', 1)
-            parsed_params = parse_qs(url_params_str)
-            minified_params = {}
-            for key, value in parsed_params.items():
-                short_key = URL_PARAM_MAP.get(key, key)
-                minified_params[short_key] = value
-            
-            minified_url_params_str = urlencode(minified_params, doseq=True)
-            final_url = f"{base_url}?{minified_url_params_str}"
-        else:
-            final_url = booking_url
 
         return {
             "program": program_code,
             "transfer_partners": transfer_partners,
-            "booking_url": final_url, # New key
-            "cabins": {}
+            "cabins": [] # Initialize as an empty list
         }
 
     def _process_deals(self, deals_chunk: List[Dict[str, Any]], best_deals: Dict[Any, Any]):
@@ -464,11 +454,24 @@ class PointsYeahScraper:
                     elif "business" in cabin: cabin_code = "J"
                     elif "first" in cabin: cabin_code = "F"
                     
-                    cabin_deal_data = [points, payment.get('tax')]
+                    # New cabin deal format: [cabin_code, points, tax]
+                    cabin_deal_data = [cabin_code, points, payment.get('tax')]
 
-                    existing_cabin_deal = option_data["cabins"].get(cabin_code)
-                    if not existing_cabin_deal or points < existing_cabin_deal[0]:
-                        option_data["cabins"][cabin_code] = cabin_deal_data
+                    # Find if a deal for this cabin already exists and update if better
+                    existing_cabin_deal_index = -1
+                    for i, existing_deal in enumerate(option_data["cabins"]):
+                        if existing_deal[0] == cabin_code:
+                            existing_cabin_deal_index = i
+                            break
+                    
+                    if existing_cabin_deal_index != -1:
+                        # If new deal is cheaper, replace it
+                        if points < option_data["cabins"][existing_cabin_deal_index][1]:
+                            option_data["cabins"][existing_cabin_deal_index] = cabin_deal_data
+                    else:
+                        # If no deal for this cabin exists, add it
+                        option_data["cabins"].append(cabin_deal_data)
+
                 except TypeError as e:
                     print(f"Error processing deal: {e}")
                     print(f"Problematic segments: {valid_segments}")
@@ -486,11 +489,13 @@ class PointsYeahScraper:
             route_key = (origin, destination)
 
             for _, option_data in program_options.items():
-                if 'Y' in option_data['cabins']:
-                    points = option_data['cabins']['Y'][0]
-                    if route_key not in economy_prices_by_route:
-                        economy_prices_by_route[route_key] = []
-                    economy_prices_by_route[route_key].append(points)
+                for cabin_deal in option_data['cabins']:
+                    cabin_code = cabin_deal[0]
+                    if cabin_code == 'Y':
+                        points = cabin_deal[1]
+                        if route_key not in economy_prices_by_route:
+                            economy_prices_by_route[route_key] = []
+                        economy_prices_by_route[route_key].append(points)
 
         # 2. Calculate the points threshold for economy on each route
         economy_thresholds: Dict[Tuple[str, str], float] = {}
@@ -517,24 +522,23 @@ class PointsYeahScraper:
 
             filtered_program_options = {}
             for program_code, option_data in program_options.items():
-                filtered_cabins = {}
-                for cabin_code, cabin_deal in option_data['cabins'].items():
-                    points = cabin_deal[0]
+                filtered_cabins = []
+                for cabin_deal in option_data['cabins']:
+                    cabin_code = cabin_deal[0]
+                    points = cabin_deal[1]
                     
                     should_keep = True
                     if cabin_code in fixed_thresholds:
                         if points > fixed_thresholds[cabin_code]:
                             should_keep = False
                     elif cabin_code == 'Y':
-                        # Only filter if a threshold was calculated for this route
                         if route_key in economy_thresholds and points > economy_thresholds[route_key]:
                             should_keep = False
                     
                     if should_keep:
-                        filtered_cabins[cabin_code] = cabin_deal
+                        filtered_cabins.append(cabin_deal)
                 
                 if filtered_cabins:
-                    # Important: create a copy to avoid modifying the original dict while iterating
                     new_option_data = option_data.copy()
                     new_option_data['cabins'] = filtered_cabins
                     filtered_program_options[program_code] = new_option_data
@@ -558,9 +562,10 @@ class PointsYeahScraper:
             destination = segments_key[-1][2]
 
             for program_code, option_data in program_options.items():
-                for cabin_code, cabin_deal in option_data['cabins'].items():
-                    points = cabin_deal[0]
-                    fees = cabin_deal[1] or 0 # tax can be None
+                for cabin_deal in option_data['cabins']:
+                    cabin_code = cabin_deal[0]
+                    points = cabin_deal[1]
+                    fees = cabin_deal[2] if len(cabin_deal) > 2 and cabin_deal[2] is not None else 0
 
                     all_individual_deals.append({
                         "segments_key": segments_key,
@@ -638,10 +643,11 @@ class PointsYeahScraper:
         for segments_key, (duration, program_options) in deals_dict.items():
             new_program_options = {}
             for program_code, option_data in program_options.items():
-                new_cabins = {}
-                for cabin_code, cabin_deal in option_data['cabins'].items():
+                new_cabins = []
+                for cabin_deal in option_data['cabins']:
+                    cabin_code = cabin_deal[0]
                     if (segments_key, program_code, cabin_code) in filtered_deals_to_keep:
-                        new_cabins[cabin_code] = cabin_deal
+                        new_cabins.append(cabin_deal)
                 
                 if new_cabins:
                     new_option_data = option_data.copy()
@@ -702,10 +708,10 @@ class PointsYeahScraper:
             
             award_origin = first_segment[1]
             award_destination = last_segment[2]
-            award_departure_time_str = first_segment[3]
-            if not award_departure_time_str: continue
+            award_departure_timestamp = first_segment[3]
+            if not award_departure_timestamp: continue
             
-            award_departure_datetime = datetime.fromisoformat(award_departure_time_str)
+            award_departure_datetime = datetime.fromtimestamp(award_departure_timestamp)
             award_departure_time = award_departure_datetime.time()
             award_departure_date = award_departure_datetime.date()
             
@@ -732,12 +738,13 @@ class PointsYeahScraper:
                         cash_cabin_code = cash_flight['cabin_code']
                         
                         for program_code, option_data in program_options.items():
-                            if cash_cabin_code in option_data['cabins']:
-                                cabin_deal = option_data['cabins'][cash_cabin_code]
-                                if len(cabin_deal) == 2: # Only add cash price once
-                                    points = cabin_deal[0]
-                                    cpp = round((price / points) * 100, 2) if points > 0 else 0
-                                    cabin_deal.extend([price, cpp])
+                            for cabin_deal in option_data['cabins']:
+                                if cabin_deal[0] == cash_cabin_code:
+                                    if len(cabin_deal) == 3: # points, tax, and maybe None for cash
+                                        points = cabin_deal[1]
+                                        cpp = round((price / points) * 100, 2) if points > 0 else 0
+                                        cabin_deal.extend([price, cpp])
+                                    break # Move to next program once matched
                     except (ValueError, TypeError, KeyError):
                         continue
 
