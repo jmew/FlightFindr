@@ -32,14 +32,19 @@ export async function chatHandler(req: Request, res: Response) {
   try {
     const clientData = await getOrCreateClient(sessionId, authToken);
     if (!clientData) {
-      res.status(401).json({ error: 'Unauthorized: Invalid token.' });
+      // It's crucial to check if headers have been sent before trying to send another response.
+      if (!res.headersSent) {
+        res.status(401).json({ error: 'Unauthorized: Invalid token.' });
+      }
       return;
     }
 
     const { config, client, abortController } = clientData;
     const message = req.query['message'] as string;
     if (!message) {
-      res.status(400).json({ error: 'Message is required.' });
+      if (!res.headersSent) {
+        res.status(400).json({ error: 'Message is required.' });
+      }
       return;
     }
 
@@ -51,13 +56,17 @@ export async function chatHandler(req: Request, res: Response) {
     });
 
     await streamGeminiResponse(res, client, config, [{ text: message }], abortController! );
-    res.end();
 
   } catch (error) {
     console.error('Error processing chat message:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'An unknown error occurred.';
-    sendSseMessage(res, 'error', { error: errorMessage });
-    res.end();
+    if (!res.headersSent) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'An unknown error occurred.';
+      sendSseMessage(res, 'error', { error: errorMessage });
+    }
+  } finally {
+    if (!res.writableEnded) {
+      res.end();
+    }
   }
 }
