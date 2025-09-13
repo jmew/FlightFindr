@@ -51,13 +51,13 @@ export async function chatHandler(req: Request, res: Response) {
     });
 
     await streamGeminiResponse(res, client, config, [{ text: message }], abortController! );
+    res.end();
 
   } catch (error) {
     console.error('Error processing chat message:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'An unknown error occurred.';
     sendSseMessage(res, 'error', { error: errorMessage });
-  } finally {
     res.end();
   }
 }
