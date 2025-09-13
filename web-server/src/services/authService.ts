@@ -25,6 +25,8 @@ const homeDir = process.env.HOME || process.env.USERPROFILE;
 const OAUTH_CREDS_PATH = path.join(homeDir!, '.config', 'gcloud', 'gemini-credentials.json');
 
 
+const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || 'http://localhost:3000';
+
 export function getOAuthClient() {
   return new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
@@ -35,7 +37,7 @@ export function getOAuthClient() {
 export function startLogin(): string {
     const client = getOAuthClient();
     // This URI must match the one registered in Google Cloud Console and the one in our callback route.
-    const redirectUri = 'http://localhost:3000/auth/google/callback';
+    const redirectUri = `${BACKEND_BASE_URL}/auth/google/callback`;
 
     const authUrl = client.generateAuthUrl({
         redirect_uri: redirectUri,
@@ -49,7 +51,7 @@ export function startLogin(): string {
 
 export async function exchangeCodeForToken(code: string): Promise<any> {
     const client = getOAuthClient();
-    const redirectUri = 'http://localhost:3000/auth/google/callback';
+    const redirectUri = `${BACKEND_BASE_URL}/auth/google/callback`;
     const { tokens } = await client.getToken({
         code,
         redirect_uri: redirectUri,

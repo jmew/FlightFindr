@@ -6,6 +6,7 @@ import { parseMultiCityMessage } from '../utils/message-parser';
 
 interface UseChatOptions {
   isAuthenticated: boolean;
+  onAuthSuccess: (token: string) => void;
   onAuthRequired: (message: string) => void;
 }
 

@@ -109,11 +109,15 @@ The `fastmcp` library does not appear to support the ASGI `lifespan` protocol fo
 
 #### Production vs. Development Authentication
 
-The application uses two different authentication strategies depending on the environment:
+The application uses two different authentication strategies depending on the environment. This is critical for the OAuth flow to work correctly when the frontend and backend are deployed to different domains (e.g., GitHub Pages and Google Cloud Run).
 
-*   **Production Mode:** In the deployed environment (`NODE_ENV=production`), the application uses a "just-in-time" Google OAuth flow. The user is only prompted to sign in via a modal when they submit their first chat message. The backend verifies the user's OAuth token for every request but uses its own server-side `GEMINI_API_KEY` to communicate with the Gemini API. The user's token is stored securely in the browser's `localStorage` to persist the session.
+*   **Production Mode:** In the deployed environment, the frontend and backend must know each other's public URLs. This is configured via environment variables.
+    *   **Frontend (`web-frontend`):** The `VITE_API_BASE_URL` variable tells the frontend the location of the backend. This is set in the `.github/workflows/deploy-frontend.yml` file and should be configured as a **Repository Secret** in GitHub Actions.
+    *   **Backend (`web-server`):** The backend needs two variables set in its Google Cloud Run service configuration:
+        *   `BACKEND_BASE_URL`: The public URL of the `web-server` itself. This is used to construct the correct OAuth `redirect_uri`.
+        *   `FRONTEND_BASE_URL`: The public URL of the deployed frontend. This is used to securely send the authentication token back to the frontend using `postMessage`.
 
-*   **Development Mode:** When running locally (`npm run dev`), the OAuth flow is bypassed by default to speed up development. The frontend operates in a pre-authenticated state, and the backend relies on the `GEMINI_API_KEY` environment variable. To test the full OAuth flow locally, append `?force_oauth=true` to the URL (e.g., `http://localhost:5173/?force_oauth=true`).
+*   **Development Mode:** When running locally (`npm run dev`), the code automatically falls back to default `localhost` URLs for both the frontend and backend, and the Vite proxy handles the cross-origin requests. To test the full OAuth flow locally, append `?force_oauth=true` to the URL (e.g., `http://localhost:5173/?force_oauth=true`).
 
 #### Per-Request Backend Authentication
 

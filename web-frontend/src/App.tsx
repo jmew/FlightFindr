@@ -4,8 +4,6 @@ import ChatConversation from './components/chat/ChatConversation';
 import AuthModal from './components/common/AuthModal';
 import { useChat } from './hooks/useChat';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (import.meta.env.DEV) {
@@ -24,6 +22,12 @@ const App: React.FC = () => {
     setAuthModalOpen(true);
   };
 
+  const handleAuthSuccess = (tokens: any) => {
+    localStorage.setItem('google_auth_token', JSON.stringify(tokens));
+    setIsAuthenticated(true);
+    setAuthModalOpen(false);
+  };
+
   const {
     messages,
     input,
@@ -34,7 +38,7 @@ const App: React.FC = () => {
     handleFormSubmit,
     handleSendMessage,
     handleStop,
-  } = useChat({ isAuthenticated, onAuthRequired: handleAuthRequired });
+  } = useChat({ isAuthenticated, onAuthRequired: handleAuthRequired, onAuthSuccess: handleAuthSuccess });
 
   // Effect to handle the post-login action
   useEffect(() => {
@@ -44,31 +48,9 @@ const App: React.FC = () => {
     }
   }, [isAuthenticated, pendingMessage, handleSendMessage]);
 
-  // Effect to listen for the auth popup message
-  useEffect(() => {
-    const handleAuthMessage = (event: MessageEvent) => {
-      const expectedOrigin = new URL(API_BASE_URL).origin;
-      if (event.origin !== expectedOrigin) {
-        return;
-      }
-      
-      if (event.data && event.data.access_token) {
-        localStorage.setItem('google_auth_token', JSON.stringify(event.data));
-        setIsAuthenticated(true);
-        setAuthModalOpen(false);
-      }
-    };
-
-    window.addEventListener('message', handleAuthMessage);
-
-    return () => {
-      window.removeEventListener('message', handleAuthMessage);
-    };
-  }, []); // Empty dependency array ensures this runs only once
-
   return (
     <main className="chat-app">
-      <AuthModal show={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+      <AuthModal show={authModalOpen} onClose={() => setAuthModalOpen(false)} onAuthSuccess={handleAuthSuccess} />
       <ChatConversation
         messages={messages}
         input={input}
