@@ -1,6 +1,8 @@
 import React from 'react';
 import styles from './AuthModal.module.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 interface AuthModalProps {
   show: boolean;
   onClose: () => void;
@@ -12,9 +14,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ show, onClose }) => {
   }
 
   const handleLogin = () => {
-    // Use a relative path for the auth URL.
-    // This works seamlessly in both development (with Vite proxy) and production.
-    const authUrl = `/auth/google`;
+    const authUrl = `${API_BASE_URL}/auth/google`;
     window.open(authUrl, 'authWindow', 'width=500,height=600');
   };
 
